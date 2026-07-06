@@ -58,7 +58,7 @@ class PayDunyaGateway(BaseGateway):
         settings.PAYDUNYA_PUBLIC_KEY   ← PAYDUNYA_PUBLIC_KEY
         settings.PAYDUNYA_PRIVATE_KEY  ← PAYDUNYA_PRIVATE_KEY
         settings.PAYDUNYA_TOKEN        ← PAYDUNYA_TOKEN
-        settings.PAYDUNYA_BASE_URL     ← (optionnel, défaut https://outrage-dealer-entrap.ngrok-free.dev/api/v1)
+        settings.PAYDUNYA_BASE_URL     ← (optionnel, défaut https://ecommerce-atelier-terroir-backtend-prod.onrender.com/api/v1)
 
     Les 4 clés sont transmises comme headers HTTP à chaque requête.
     """
@@ -168,8 +168,8 @@ class PayDunyaGateway(BaseGateway):
         # Ajouter 'actions' uniquement si les URLs sont définies pour éviter les erreurs PayDunya
         actions = {}
         
-        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
-        backend_url = getattr(settings, "BACKEND_URL", "https://outrage-dealer-entrap.ngrok-free.dev")
+        frontend_url = getattr(settings, "FRONTEND_URL", "https://atelierterroirsolime.vercel.app")
+        backend_url = getattr(settings, "BACKEND_URL", "https://ecommerce-atelier-terroir-backtend-prod.onrender.com")
         
         cancel_url = getattr(settings, "PAYDUNYA_CANCEL_URL", f"{frontend_url}/commandes")
         return_url = getattr(settings, "PAYDUNYA_RETURN_URL", f"{frontend_url}/commandes?payment=success")

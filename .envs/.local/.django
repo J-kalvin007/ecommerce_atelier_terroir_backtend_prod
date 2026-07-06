@@ -15,6 +15,6 @@ CELERY_FLOWER_PASSWORD=YHX8egSzLUFinAh06urtCOgGmV1CmVvEpTVIVv7eeROyvHS5jTJbMeVLu
 
 
 
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=https://atelierterroirsolime.vercel.app
 LOYALTY_POINTS_EXPIRY_DAYS=365
-BACKEND_URL=https://outrage-dealer-entrap.ngrok-free.dev
+BACKEND_URL=https://ecommerce-atelier-terroir-backtend-prod.onrender.com

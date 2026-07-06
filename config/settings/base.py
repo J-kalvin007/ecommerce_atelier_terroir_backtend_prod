@@ -282,8 +282,8 @@ ADMINS = [("""Takoudjou Kalvin Moise""", "takoudjoumoisecalvin@gmail.com")]
 MANAGERS = ADMINS
 
 # URL du Frontend (Next.js) pour les redirections (emails, paiements, etc.)
-FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
-BACKEND_URL = env("BACKEND_URL", default="https://outrage-dealer-entrap.ngrok-free.dev")
+FRONTEND_URL = env("FRONTEND_URL", default="https://atelierterroirsolime.vercel.app")
+BACKEND_URL = env("BACKEND_URL", default="https://ecommerce-atelier-terroir-backtend-prod.onrender.com")
 # https://cookiecutter-django.readthedocs.io/en/latest/settings.html#other-environment-settings
 # Force the `admin` sign in process to go through the `django-allauth` workflow
 DJANGO_ADMIN_FORCE_ALLAUTH = env.bool("DJANGO_ADMIN_FORCE_ALLAUTH", default=False)

@@ -11,7 +11,7 @@ def password_reset_url_generator(request, user, temp_key):
     la vue CustomPasswordResetConfirmView decode l'uid avec urlsafe_base64_decode,
     ce qui est aligné avec le SetPasswordForm de Django standard.
     """
-    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    frontend_url = getattr(settings, "FRONTEND_URL", "https://atelierterroirsolime.vercel.app")
 
     # Encodage base64url standard Django — cohérent avec CustomPasswordResetConfirmView
     uid = urlsafe_base64_encode(force_bytes(user.pk))

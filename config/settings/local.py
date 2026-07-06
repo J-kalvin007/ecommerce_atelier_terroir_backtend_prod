@@ -30,16 +30,18 @@ ALLOWED_HOSTS = [
 
     "*",
     ".ngrok-free.dev",
+    ".onrender.com",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
 
     "https://*.ngrok-free.dev",
+    "https://*.onrender.com",
 ]
 
-# FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
+# FRONTEND_URL = env("FRONTEND_URL", default="https://atelierterroirsolime.vercel.app")
 
-# BACKEND_URL = env("BACKEND_URL", default="https://outrage-dealer-entrap.ngrok-free.dev")
+# BACKEND_URL = env("BACKEND_URL", default="https://ecommerce-atelier-terroir-backtend-prod.onrender.com")
 
 
 # CACHES - LocMemCache, pas Redis (Redis n'est plus dans la stack locale)
@@ -143,11 +145,11 @@ PAYDUNYA_URLS = {
 }
 
 
-# PAYDUNYA_CANCEL_URL = "http://localhost:3000/commandes"
-# PAYDUNYA_RETURN_URL = "http://localhost:3000/products"
+# PAYDUNYA_CANCEL_URL = "https://atelierterroirsolime.vercel.app/commandes"
+# PAYDUNYA_RETURN_URL = "https://atelierterroirsolime.vercel.app/products"
 
-# PAYDUNYA_WALLET_CANCEL_URL = "http://localhost:3000/customer/fedilites"
-# PAYDUNYA_WALLET_SUCCESS_URL = "http://localhost:3000/customer/wallet"
+# PAYDUNYA_WALLET_CANCEL_URL = "https://atelierterroirsolime.vercel.app/customer/fedilites"
+# PAYDUNYA_WALLET_SUCCESS_URL = "https://atelierterroirsolime.vercel.app/customer/wallet"
 
 
 # 🔄 Remplacement des chaînes en dur par la variable dynamique FRONTEND_URL
@@ -167,5 +169,5 @@ paydunya.api_keys = {
 
 paydunya.debug = True
 
-# PAYDUNYA_CALLBACK_URL = "https://outrage-dealer-entrap.ngrok-free.dev/api/v1/paiements/ipn/"
+# PAYDUNYA_CALLBACK_URL = "https://ecommerce-atelier-terroir-backtend-prod.onrender.com/api/v1/paiements/ipn/"
 PAYDUNYA_CALLBACK_URL = f"{BACKEND_URL}/api/v1/paiements/ipn/"

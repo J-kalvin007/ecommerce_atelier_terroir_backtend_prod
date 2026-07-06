@@ -23,7 +23,7 @@ class AccountAdapter(DefaultAccountAdapter):
         """
         Génère l'URL de vérification d'email pointant vers le frontend.
         """
-        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+        frontend_url = getattr(settings, "FRONTEND_URL", "https://atelierterroirsolime.vercel.app")
         return f"{frontend_url}/auth/verify-email?key={emailconfirmation.key}"
 
     def send_mail(self, template_prefix: str, email: str, context: dict) -> None:
