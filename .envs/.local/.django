@@ -1,0 +1,20 @@
+# General
+# ------------------------------------------------------------------------------
+USE_DOCKER=yes
+IPYTHONDIR=/app/.ipython
+# Redis
+# ------------------------------------------------------------------------------
+REDIS_URL=redis://redis:6379/0
+
+# Celery
+# ------------------------------------------------------------------------------
+
+# Flower
+CELERY_FLOWER_USER=PIHDLlbWPlFajKPkDoqYyMndeHXCnzuA
+CELERY_FLOWER_PASSWORD=YHX8egSzLUFinAh06urtCOgGmV1CmVvEpTVIVv7eeROyvHS5jTJbMeVLuJFSwPoL
+
+
+
+FRONTEND_URL=http://localhost:3000
+LOYALTY_POINTS_EXPIRY_DAYS=365
+BACKEND_URL=https://outrage-dealer-entrap.ngrok-free.dev

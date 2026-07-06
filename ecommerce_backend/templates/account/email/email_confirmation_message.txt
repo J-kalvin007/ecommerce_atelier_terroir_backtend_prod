@@ -1,0 +1,17 @@
+{% autoescape off %}Bonjour,
+
+Merci de rejoindre L'Atelier du Terroir.
+
+Pour activer votre compte, cliquez sur le lien ci-dessous :
+
+{{ activate_url }}
+
+Ce lien est valable 72 heures.
+
+Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.
+
+---
+L'Atelier du Terroir
+Épicerie fine & produits du terroir
+© 2026 — Tous droits réservés
+{% endautoescape %}

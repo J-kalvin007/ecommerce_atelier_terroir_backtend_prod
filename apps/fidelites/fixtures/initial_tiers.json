@@ -1,0 +1,116 @@
+[
+    {
+        "model": "loyalty.loyaltytier",
+        "pk": 1,
+        "fields": {
+            "name": "Bronze",
+            "min_points": 0,
+            "min_spend": "0.00",
+            "tier_mode": "points",
+            "discount_percent": "0.00",
+            "cashback_percent": "0.00",
+            "points_multiplier": "1.00",
+            "color": "#CD7F32",
+            "icon": "shield-bronze",
+            "is_default": true,
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "loyalty.loyaltytier",
+        "pk": 2,
+        "fields": {
+            "name": "Silver",
+            "min_points": 500,
+            "min_spend": "50000.00",
+            "tier_mode": "points",
+            "discount_percent": "2.00",
+            "cashback_percent": "1.00",
+            "points_multiplier": "1.20",
+            "color": "#C0C0C0",
+            "icon": "shield-silver",
+            "is_default": false,
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "loyalty.loyaltytier",
+        "pk": 3,
+        "fields": {
+            "name": "Gold",
+            "min_points": 1500,
+            "min_spend": "150000.00",
+            "tier_mode": "points",
+            "discount_percent": "5.00",
+            "cashback_percent": "2.00",
+            "points_multiplier": "1.50",
+            "color": "#FFD700",
+            "icon": "shield-gold",
+            "is_default": false,
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "loyalty.loyaltytier",
+        "pk": 4,
+        "fields": {
+            "name": "Platinum",
+            "min_points": 5000,
+            "min_spend": "500000.00",
+            "tier_mode": "points",
+            "discount_percent": "8.00",
+            "cashback_percent": "3.00",
+            "points_multiplier": "1.75",
+            "color": "#E5E4E2",
+            "icon": "shield-platinum",
+            "is_default": false,
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "loyalty.loyaltytier",
+        "pk": 5,
+        "fields": {
+            "name": "Diamond",
+            "min_points": 15000,
+            "min_spend": "1500000.00",
+            "tier_mode": "points",
+            "discount_percent": "12.00",
+            "cashback_percent": "5.00",
+            "points_multiplier": "2.00",
+            "color": "#B9F2FF",
+            "icon": "shield-diamond",
+            "is_default": false,
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "loyalty.loyaltytier",
+        "pk": 6,
+        "fields": {
+            "name": "Elite",
+            "min_points": 50000,
+            "min_spend": "5000000.00",
+            "tier_mode": "points",
+            "discount_percent": "15.00",
+            "cashback_percent": "7.00",
+            "points_multiplier": "2.50",
+            "color": "#FF1493",
+            "icon": "shield-elite",
+            "is_default": false,
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        }
+    }
+]

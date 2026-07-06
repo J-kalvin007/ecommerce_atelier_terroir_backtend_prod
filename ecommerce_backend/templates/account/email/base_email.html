@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:v="urn:schemas-microsoft-com:vml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>{% block subject %}L'Atelier du Terroir{% endblock %}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { margin: 0; padding: 0; background-color: #F0EDE6; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-text-size-adjust: 100%; }
+    table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; display: block; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+    a { text-decoration: none; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#F0EDE6;">
+
+  <!-- Outer wrapper : padding vertical réduit (40px -> 24px) pour limiter la hauteur totale de l'email -->
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F0EDE6;">
+    <tr>
+      <td align="center" style="padding:24px 16px;">
+
+        <!-- Card container -->
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;width:100%;">
+
+          <!-- ═══ HEADER (compact : logo + titre + icône fusionnés sur une seule bande) ═══ -->
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+                     style="background:linear-gradient(135deg,#0F2D20 0%,#1a4a30 50%,#0F2D20 100%);border-radius:20px 20px 0 0;overflow:hidden;">
+                <tr>
+                  <td style="padding:0;">
+                    <!-- Fine liseré or supérieur -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                      <tr>
+                        <td style="height:3px;background:linear-gradient(90deg,#C9963A 0%,#e8b84b 50%,#C9963A 100%);"></td>
+                      </tr>
+                    </table>
+                    <!-- Bandeau marque : logo + nom en ligne, très bas en hauteur -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                      <tr>
+                        <td align="center" style="padding:20px 32px 4px;">
+                          <table cellpadding="0" cellspacing="0" role="presentation">
+                            <tr>
+                              <td style="padding-right:10px;vertical-align:middle;">
+                                <img src="https://outrage-dealer-entrap.ngrok-free.dev/media/logo/LOGO.png"
+                                     alt="L'Atelier du Terroir"
+                                     width="30" height="30"
+                                     style="width:30px;height:30px;object-fit:contain;border-radius:7px;" />
+                              </td>
+                              <td style="vertical-align:middle;">
+                                <p style="font-family:'Inter',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#C9963A;margin:0;">L'Atelier du Terroir</p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Bloc titre : icône, titre et sous-titre condensés -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                      <tr>
+                        <td align="center" style="padding:8px 32px 24px;">
+                          {% block header_icon %}
+                          <!-- Icon placeholder -->
+                          {% endblock %}
+                          {% block header_title %}
+                          <h1 style="font-family:'Inter',sans-serif;font-size:21px;font-weight:800;color:#ffffff;letter-spacing:-0.4px;margin:10px 0 4px;">Bienvenue</h1>
+                          {% endblock %}
+                          {% block header_subtitle %}
+                          <p style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;color:rgba(255,255,255,0.5);margin:0;line-height:1.4;">L'Atelier du Terroir</p>
+                          {% endblock %}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ═══ BODY ═══ -->
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+                     style="background:#ffffff;">
+                <tr>
+                  <td style="padding:28px 32px 24px;">
+                    {% block body %}{% endblock %}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ═══ FOOTER (compact : plus de bandeau "trust badges", une seule ligne signature) ═══ -->
+          <tr>
+            <td>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+                     style="background:#0F2D20;border-radius:0 0 20px 20px;overflow:hidden;">
+                <tr>
+                  <td style="height:3px;background:linear-gradient(90deg,#C9963A 0%,#e8b84b 50%,#C9963A 100%);"></td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:18px 32px;">
+                    <p style="font-family:'Inter',sans-serif;font-size:11px;color:rgba(255,255,255,0.4);margin:0 0 4px;text-align:center;">
+                      Vous recevez cet e-mail car vous avez un compte sur L'Atelier du Terroir.
+                    </p>
+                    <p style="font-family:'Inter',sans-serif;font-size:10px;color:rgba(255,255,255,0.25);margin:0;text-align:center;">
+                      © 2026 L'Atelier du Terroir · Tous droits réservés
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

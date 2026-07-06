@@ -1,0 +1,72 @@
+# =============================================================================
+# .dockerignore
+# Empêche Docker de copier des Go de données inutiles dans le contexte de build
+# Impact: réduit le temps de build de plusieurs minutes à quelques secondes
+# =============================================================================
+
+# Environnements virtuels Python (le plus gros gain)
+.venv/
+venv/
+env/
+ENV/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+.gitlab-ci.yml
+
+# CI / Outils dev
+.pre-commit-config.yaml
+.readthedocs.yml
+.travis.yml
+.editorconfig
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Tests et couverture
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+
+# Outils de dev locaux
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Fichiers de build Python
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Node.js
+node_modules/
+
+# Fichiers OS
+.DS_Store
+Thumbs.db
+
+# Fichiers statiques collectés
+staticfiles/
+
+# Backups et secrets
+*.sql
+*.dump
+.env
+.envs/

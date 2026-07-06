@@ -1,0 +1,1 @@
+{% autoescape off %}Confirmez votre adresse e-mail — L'Atelier du Terroir{% endautoescape %}

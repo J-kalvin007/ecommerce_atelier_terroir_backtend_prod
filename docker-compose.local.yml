@@ -1,0 +1,85 @@
+volumes:
+  ecommerce_backend_local_postgres_data: {}
+  ecommerce_backend_local_postgres_data_backups: {}
+
+services:
+  django:
+    build:
+      context: .
+      dockerfile: ./compose/local/django/Dockerfile
+      network: host
+    image: ecommerce_backend_local_django
+    container_name: ecommerce_backend_local_django
+    depends_on:
+      - postgres
+      - mailpit
+    volumes:
+      # .venv est isolé pour éviter le polling de fichiers Windows -> Linux (cause CPU 100%)
+      - /app/.venv
+      - .:/app:z
+    env_file:
+      - ./.envs/.local/.django
+      - ./.envs/.local/.postgres
+      - ./.envs/.local/.payDunya
+      - ./.envs/.local/.env
+    ports:
+      - '8000:8000'
+    command: /start
+    deploy:
+      resources:
+        limits:
+          cpus: '1.2'
+          memory: 1G
+        reservations:
+          memory: 512M
+    restart: always
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./compose/production/postgres/Dockerfile
+    image: ecommerce_backend_production_postgres
+    container_name: ecommerce_backend_local_postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ecommerce_backend_local_postgres_data:/var/lib/postgresql/data
+      - ecommerce_backend_local_postgres_data_backups:/backups
+    env_file:
+      - ./.envs/.local/.postgres
+    # Paramètres PostgreSQL tuned pour faible RAM
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=256MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=20
+      -c synchronous_commit=off
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 128M
+    restart: always
+
+  mailpit:
+    image: docker.io/axllent/mailpit:latest
+    container_name: ecommerce_backend_local_mailpit
+    ports:
+      - "8025:8025" # Interface web (celle que tu consultes sur ton navigateur)
+      - "1025:1025" # Port SMTP (celui que Django utilise)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+    restart: always
+
+# SERVICES DÉSACTIVÉS pour économiser ~1.5 GB RAM et ~1 CPU complet
+# Celery tourne désormais en mode EAGER (synchrone) via CELERY_TASK_ALWAYS_EAGER=True
+# Pour les réactiver ponctuellement : docker compose up redis celeryworker --no-deps
+#
+# Pour accéder à la base de données, utilisez DBeaver (natif Windows) sur localhost:5432
+# C'est beaucoup plus rapide que pgadmin dans un conteneur

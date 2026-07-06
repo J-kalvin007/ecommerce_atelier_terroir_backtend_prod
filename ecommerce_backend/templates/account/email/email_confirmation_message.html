@@ -1,0 +1,70 @@
+{% extends "account/email/base_email.html" %}
+
+{% block header_icon %}
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
+  <tr>
+    <td align="center"
+        style="width:44px;height:44px;background:linear-gradient(135deg,rgba(201,150,58,0.2),rgba(201,150,58,0.05));border:1px solid rgba(201,150,58,0.3);border-radius:50%;text-align:center;line-height:44px;font-size:19px;">
+      ✉️
+    </td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block header_title %}
+<h1 style="font-family:'Inter',sans-serif;font-size:21px;font-weight:800;color:#ffffff;letter-spacing:-0.4px;margin:10px 0 4px;">Confirmez votre adresse</h1>
+{% endblock %}
+
+{% block header_subtitle %}
+<p style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;color:rgba(255,255,255,0.5);margin:0;line-height:1.4;">Vérification d'e-mail</p>
+{% endblock %}
+
+{% block body %}
+  <!-- Texte principal condensé : greeting + message fusionnés en un seul paragraphe -->
+  <p style="font-family:'Inter',sans-serif;font-size:14px;font-weight:400;color:#4a5568;line-height:1.6;margin:0 0 20px;">
+    Bonjour, merci de rejoindre <strong style="color:#0F2D20;">L'Atelier du Terroir</strong>. Confirmez votre adresse e-mail pour activer votre compte et accéder à nos produits du terroir.
+  </p>
+
+  <!-- CTA Button -->
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:14px;">
+    <tr>
+      <td align="center">
+        <table cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td align="center"
+                style="background:linear-gradient(135deg,#0F2D20 0%,#1a4a30 100%);border-radius:12px;padding:0;box-shadow:0 6px 16px rgba(15,45,32,0.25);">
+              <a href="{{ activate_url }}"
+                 style="display:inline-block;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;padding:14px 36px;letter-spacing:0.02em;">
+                ✓ &nbsp; Confirmer mon adresse e-mail
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Ligne d'info fine (72h) : remplace l'ancienne carte pleine hauteur -->
+  <p style="font-family:'Inter',sans-serif;font-size:11px;color:#8a9685;margin:0 0 20px;text-align:center;line-height:1.5;">
+    🌿 Ce lien est valable <strong style="color:#0F2D20;">72 heures</strong> · pensez à vérifier vos spams
+  </p>
+
+  <!-- Fallback URL : version compacte, sans carte encadrée -->
+  <p style="font-family:'Inter',sans-serif;font-size:11px;color:#8a9685;margin:0 0 6px;text-align:center;">
+    Le bouton ne fonctionne pas ? Copiez ce lien :
+  </p>
+  <p style="font-family:'Inter',sans-serif;font-size:10px;color:#C9963A;word-break:break-all;text-align:center;margin:0 0 18px;">
+    <a href="{{ activate_url }}" style="color:#C9963A;text-decoration:none;">{{ activate_url }}</a>
+  </p>
+
+  <!-- Avertissement sécurité condensé -->
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <tr>
+      <td style="background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:10px 14px;">
+        <p style="font-family:'Inter',sans-serif;font-size:11px;color:#92400e;margin:0;line-height:1.5;">
+          ⚠️ Vous n'êtes pas à l'origine de cette demande ? Ignorez cet e-mail, aucun compte ne sera créé.
+        </p>
+      </td>
+    </tr>
+  </table>
+{% endblock %}
