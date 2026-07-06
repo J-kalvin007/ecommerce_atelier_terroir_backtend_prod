@@ -4,15 +4,40 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-# ─── 1. Appliquer les migrations ──────────────────────
+# ─── 1. Backup automatique vers Supabase Storage ───────
+if [ -n "${DJANGO_AWS_ACCESS_KEY_ID:-}" ] && [ -n "${DJANGO_AWS_SECRET_ACCESS_KEY:-}" ] && [ -n "${DJANGO_AWS_S3_ENDPOINT_URL:-}" ] && [ -n "${DJANGO_AWS_STORAGE_BUCKET_NAME:-}" ]; then
+    echo "Starting database backup..."
+    python /backup_to_s3.py || echo "WARNING: Backup failed, continuing anyway"
+else
+    echo "S3 credentials not fully set – skipping backup."
+fi
+
+# ─── 2. Appliquer les migrations ──────────────────────
 echo "Running database migrations..."
 python /app/manage.py migrate --noinput
 
-# ─── 2. Collecter les fichiers statiques ──────────────
+# ─── 3. Collecter les fichiers statiques ──────────────
 echo "Collecting static files..."
 python /app/manage.py collectstatic --noinput
 
-# ─── 3. Lancer Gunicorn sur le port de Render ─────────
+# ─── 4. Créer le super‑utilisateur (si configuré) ────
+if [ -n "${DJANGO_SUPERUSER_EMAIL:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
+    echo "Checking for superuser..."
+    python /app/manage.py shell -c "
+from django.contrib.auth import get_user_model
+User = get_user_model()
+email = '${DJANGO_SUPERUSER_EMAIL}'
+if not User.objects.filter(email=email).exists():
+    User.objects.create_superuser(email=email, password='${DJANGO_SUPERUSER_PASSWORD}')
+    print(f'Superuser {email} created.')
+else:
+    print(f'Superuser {email} already exists.')
+"
+else
+    echo "DJANGO_SUPERUSER_EMAIL or DJANGO_SUPERUSER_PASSWORD not set – skipping superuser creation."
+fi
+
+# ─── 5. Lancer Gunicorn sur le port dynamique ─────────
 exec gunicorn config.asgi \
   --bind 0.0.0.0:${PORT:-8000} \
   --chdir=/app \
