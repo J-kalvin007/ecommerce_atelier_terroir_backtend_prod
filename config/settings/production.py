@@ -131,7 +131,14 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
-MEDIA_URL = f"https://{aws_s3_domain}/media/"
+
+# MEDIA_URL = f"https://{aws_s3_domain}/media/"
+# Utilise un fallback si aws_s3_domain est None
+if aws_s3_domain:
+    MEDIA_URL = f"https://{aws_s3_domain}/media/"
+else:
+    # URL de secours vers le bucket direct si pas de domaine personnalisé
+    MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/media/"
 
 # EMAIL
 # ------------------------------------------------------------------------------
