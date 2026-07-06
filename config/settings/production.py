@@ -100,12 +100,11 @@ AWS_S3_MAX_MEMORY_SIZE = env.int(
 
 
 # CODE À METTRE À LA PLACE :
-AWS_S3_REGION_NAME = env("DJANGO_AWS_S3_REGION_NAME", default="auto")
-AWS_S3_ENDPOINT_URL = env("DJANGO_AWS_S3_ENDPOINT_URL")  # Crucial pour Cloudflare R2
+# Configuration spécifique pour Supabase Storage (API S3 compatible)
+AWS_S3_REGION_NAME = env("DJANGO_AWS_REGION_NAME", default="eu-central-1")
+AWS_S3_ENDPOINT_URL = env("DJANGO_AWS_S3_ENDPOINT_URL")
 AWS_S3_CUSTOM_DOMAIN = env("DJANGO_AWS_S3_CUSTOM_DOMAIN", default=None)
-aws_s3_domain = AWS_S3_CUSTOM_DOMAIN or f"{AWS_STORAGE_BUCKET_NAME}.r2.cloudflarestorage.com"
-
-
+aws_s3_domain = AWS_S3_CUSTOM_DOMAIN
 
 # STATIC & MEDIA
 # ------------------------
