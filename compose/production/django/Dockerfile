@@ -43,6 +43,7 @@ RUN addgroup --system django \
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # psycopg dependencies
   libpq-dev \
+  postgresql-client \
   # Translations dependencies
   gettext \
   # entrypoint
@@ -63,6 +64,10 @@ RUN chmod +x /start
 COPY --chown=django:django ./compose/production/django/celery/worker/start /start-celeryworker
 RUN sed -i 's/\r$//g' /start-celeryworker
 RUN chmod +x /start-celeryworker
+
+
+COPY --chown=django:django ./compose/production/django/backup_to_s3.py /backup_to_s3.py
+RUN chmod +x /backup_to_s3.py
 
 
 COPY --chown=django:django ./compose/production/django/celery/beat/start /start-celerybeat
