@@ -21,11 +21,7 @@ if READ_DOT_ENV_FILE:
 
 ALLOWED_HOSTS =[
     "*",
-    "http://192.168.1.66:3000",
-    "192.168.1.80",
-    "192.168.1.76",
-    "http://localhost:3000",
-    'http://localhost:3000',
+    "https://atelierterroirsolime-gyiybtd2n-j-kalvins-projects.vercel.app",
 ]
 
 CORS_URLS_REGEX = r"^/api/.*$"
@@ -42,10 +38,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 # CORS_ALLOW_CREDENTIALS = False
 
 CORS_ALLOWED_ORIGINS = [
-    "http://192.168.1.66:3000",
-    "http://192.168.1.68:3000",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "https://atelierterroirsolime-gyiybtd2n-j-kalvins-projects.vercel.app",
 ]
 
 # CORS_ALLOW_CREDENTIALS = True
