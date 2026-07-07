@@ -108,6 +108,12 @@ urlpatterns = [
         "api/v1/notifications/",
         include("apps.notifications.urls")
     ),
+
+    # ── Chatbot IA ──────────────────────────────────────────────────────────────
+    path(
+        "api/v1/chatbot/",
+        include("apps.chatbot.urls")
+    ),
 ]
 
 if settings.DEBUG:

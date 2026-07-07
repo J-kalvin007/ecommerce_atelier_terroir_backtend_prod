@@ -90,6 +90,8 @@ class Product(BaseModel):
 
     stock = models.PositiveIntegerField(
         default=0,
+        null=False,
+        blank=False,
     )
 
     weight_grams = models.PositiveIntegerField(
@@ -279,6 +281,8 @@ class ProductVariant(BaseModel):
 
     stock = models.PositiveIntegerField(
         default=0,
+        null=False,
+        blank=False,
     )
 
     weight_grams = models.PositiveIntegerField(

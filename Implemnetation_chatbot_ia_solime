@@ -1,0 +1,62 @@
+# 🚀 Implémentation du Chatbot IA terminée
+
+L'ensemble de l'architecture pour le Chatbot IA a été mis en place avec succès, conformément au plan validé. Le backend et le frontend sont maintenant connectés.
+
+> [!IMPORTANT]
+> **Actions manuelles requises (Migrations et Variables d'environnement)**
+> Comme tu travailles sur Windows et que j'ai rencontré un souci d'accès à l'exécutable Python de ton environnement virtuel, merci de lancer ces commandes manuellement dans ton terminal.
+
+### 1. Migrations de la base de données
+Ouvre un terminal à la racine de ton backend (`C:\Travaux_informatiques\Django\production\ecommerce_backend`) avec ton environnement virtuel activé, et lance :
+```bash
+python manage.py makemigrations chatbot
+python manage.py migrate
+```
+
+### 2. Variables d'environnement OpenAI
+Il est impératif d'ajouter ta clé API OpenAI pour que le backend puisse interagir avec le LLM.
+
+**Dans ton fichier `.env` du backend (`ecommerce_backend/.env`)** :
+
+*Note : Si tu préfères un modèle plus puissant, tu peux définir `OPENAI_MODEL=gpt-4o`.*
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+---
+
+## Ce qui a été implémenté
+
+### ⚙️ Côté Backend Django
+1. **Nouvelle application `chatbot`** intégrée dans `base.py` (`LOCAL_APPS`).
+2. **Modèles de données** :
+   - `Conversation` : Gère les sessions (anonymes ou liées à un compte utilisateur).
+   - `Message` : Stocke l'historique des échanges avec le rôle (`user` ou `assistant`).
+3. **Logique Métier (`ChatService`)** :
+   - Maintient un contexte de conversation limité aux 10 derniers messages.
+   - Construit le System Prompt dynamique (selon que l'utilisateur est connecté ou non).
+   - Déclenche l'appel à l'API OpenAI.
+4. **Function Calling (`api_definitions.py`)** :
+   - Exécution interne pour la recherche de produits, la lecture de catégories.
+   - Requêtes authentifiées pour lire le profil de fidélité, le wallet et les commandes.
+5. **API & Sécurité** :
+   - Endpoint `POST /api/v1/chatbot/chat/` disponible publiquement (`AllowAny`), mais restreignant automatiquement les appels internes liés au compte si le token est manquant.
+6. **Interface d'administration** :
+   - Audit complet et en lecture seule des conversations dans `admin.py`.
+
+### 🌐 Côté Frontend Next.js
+1. **API Call (`fonctions_api/ai.api.ts`)** :
+   - Appel réseau sécurisé via l'instance `apiPrivate` (qui intercepte et injecte le token JWT/DRF si disponible en mémoire locale).
+2. **Service (`services/ai.service.ts`)** :
+   - Implémente la méthode `askCommerceAssistant` appelée par ton composant d'interface `ChatBot.tsx`.
+   - Gère la persistance de l'identifiant de la conversation (`chatbot_conversation_id`) dans le `localStorage` pour maintenir le contexte entre deux rechargements de page.
+
+---
+
+## 🛠️ Comment tester ?
+
+1. Assure-toi d'avoir appliqué les migrations et ajouté la variable `OPENAI_API_KEY`.
+2. Lance ton serveur de développement backend.
+3. Lance ton serveur frontend Next.js.
+4. Clique sur la bulle du chatbot en bas à droite de l'écran.
+5. Essaie une requête publique : *« Quels produits bio recommandez-vous ? »*
+6. Connecte-toi à un compte client et essaie une requête privée : *« Où en sont mes commandes ? »* ou *« Combien d'argent ai-je dans mon wallet ? »*
+
+Si tu as besoin d'ajouter d'autres fonctionnalités à l'assistant (comme chercher les promotions ou vérifier le stock d'un produit en particulier), il suffira d'ajouter la fonction au fichier `api_definitions.py` et de créer sa méthode dans `ChatService`.

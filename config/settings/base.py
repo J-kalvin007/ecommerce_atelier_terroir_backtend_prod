@@ -127,6 +127,8 @@ LOCAL_APPS = [
     "apps.fidelites",
     "apps.livraisons",
     "apps.notifications",
+    # ── Chatbot IA ─────────────────────────────────────────────────────────────
+    "apps.chatbot",
 
     # Your stuff: custom apps go here
 ]
@@ -498,3 +500,14 @@ paydunya.api_keys = {
 paydunya.debug = True
 
 PAYDUNYA_CALLBACK_URL = f"{BACKEND_URL}/api/v1/paiements/ipn/"
+
+
+# ─── OpenAI / Chatbot IA ──────────────────────────────────────────────────────
+# Clé API OpenAI — À définir dans la variable d'environnement OPENAI_API_KEY
+# Ne jamais mettre la clé en dur dans le code source.
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+
+# Modèle OpenAI à utiliser pour le chatbot.
+# gpt-4o-mini est le rapport qualité/coût optimal pour un chatbot e-commerce.
+# Peut être remplacé par "gpt-4o" pour des réponses plus riches.
+OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
