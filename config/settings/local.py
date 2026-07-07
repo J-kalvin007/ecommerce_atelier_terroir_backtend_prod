@@ -1,5 +1,4 @@
 import os
-import  paydunya
 from .base import *  # noqa: F403
 from .base import INSTALLED_APPS
 from .base import MIDDLEWARE
@@ -127,47 +126,4 @@ INSTALLED_APPS += ["django_extensions"]
 CELERY_TASK_EAGER_PROPAGATES = True
 
 
-# ─── PayDunya ─────────────────────────────────────────────────────────────────
 
-# PAYDUNYA CONFIG
-
-PAYDUNYA_CONFIG = {
-    "MASTER_KEY": env("PAYDUNYA_MASTER_KEY", default=""),
-    "PUBLIC_KEY": env("PAYDUNYA_PUBLIC_KEY", default=""),
-    "PRIVATE_KEY": env("PAYDUNYA_PRIVATE_KEY", default=""),
-    "TOKEN": env("PAYDUNYA_TOKEN", default=""),
-    "MODE": "test",
-}
-
-PAYDUNYA_URLS = {
-    "test": "https://paydunya.com",
-    "live": "https://paydunya.com",
-}
-
-
-# PAYDUNYA_CANCEL_URL = "https://atelierterroirsolime.vercel.app/commandes"
-# PAYDUNYA_RETURN_URL = "https://atelierterroirsolime.vercel.app/products"
-
-# PAYDUNYA_WALLET_CANCEL_URL = "https://atelierterroirsolime.vercel.app/customer/fedilites"
-# PAYDUNYA_WALLET_SUCCESS_URL = "https://atelierterroirsolime.vercel.app/customer/wallet"
-
-
-# 🔄 Remplacement des chaînes en dur par la variable dynamique FRONTEND_URL
-PAYDUNYA_CANCEL_URL = f"{FRONTEND_URL}/paiement/commande/echec"
-PAYDUNYA_RETURN_URL = f"{FRONTEND_URL}/paiement/commande/success"
-
-PAYDUNYA_WALLET_CANCEL_URL = f"{FRONTEND_URL}/paiement/wallet/echec"
-PAYDUNYA_WALLET_SUCCESS_URL = f"{FRONTEND_URL}/paiement/wallet/success"
-
-
-
-paydunya.api_keys = {
-    "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG["MASTER_KEY"],
-    "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG["PRIVATE_KEY"],
-    "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG["TOKEN"],
-}
-
-paydunya.debug = True
-
-# PAYDUNYA_CALLBACK_URL = "https://ecommerce-atelier-terroir-backtend-prod.onrender.com/api/v1/paiements/ipn/"
-PAYDUNYA_CALLBACK_URL = f"{BACKEND_URL}/api/v1/paiements/ipn/"

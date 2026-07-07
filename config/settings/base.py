@@ -5,6 +5,7 @@ import ssl
 from pathlib import Path
 import environ
 from celery.schedules import crontab
+import paydunya
 
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
@@ -452,3 +453,48 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 
+# Supprimer les anciennes clés pour éviter les warnings
+ACCOUNT_EMAIL_REQUIRED = True  # déjà implicite, mais peut être laissé
+# Les deux lignes suivantes sont celles qui manquent :
+OLD_ACCOUNT_EMAIL_REQUIRED = False  # Indique qu'on utilise la nouvelle config
+OLD_ACCOUNT_USERNAME_REQUIRED = False
+
+ACCOUNT_USERNAME_REQUIRED = False
+
+
+
+
+
+# ─── PayDunya ─────────────────────────────────────────────────────────────────
+
+# PAYDUNYA CONFIG
+PAYDUNYA_CONFIG = {
+    "MASTER_KEY": env("PAYDUNYA_MASTER_KEY", default="YT6VOJwb-SVMb-rBmM-pHcN-d0A6hT6soZby"),
+    "PUBLIC_KEY": env("PAYDUNYA_PUBLIC_KEY", default="test_public_AS9eYRp3bkJYMABX3epBz8Kdowj"),
+    "PRIVATE_KEY": env("PAYDUNYA_PRIVATE_KEY", default="test_private_jD0kWB4ClTX0fSggbaTucRsbqXW"),
+    "TOKEN": env("PAYDUNYA_TOKEN", default="E6ZDUp7TsqFmqNXsNilP"),
+    "MODE": env("PAYDUNYA_MODE", default="test"),
+}
+
+PAYDUNYA_URLS = {
+    "test": "https://paydunya.com",
+    "live": "https://paydunya.com",
+}
+
+# 🔄 Remplacement des chaînes en dur par la variable dynamique FRONTEND_URL
+PAYDUNYA_CANCEL_URL = f"{FRONTEND_URL}/paiement/commande/echec"
+PAYDUNYA_RETURN_URL = f"{FRONTEND_URL}/paiement/commande/success"
+
+PAYDUNYA_WALLET_CANCEL_URL = f"{FRONTEND_URL}/paiement/wallet/echec"
+PAYDUNYA_WALLET_SUCCESS_URL = f"{FRONTEND_URL}/paiement/wallet/success"
+
+paydunya.api_keys = {
+    "PAYDUNYA-MASTER-KEY": PAYDUNYA_CONFIG["MASTER_KEY"],
+    "PAYDUNYA-PRIVATE-KEY": PAYDUNYA_CONFIG["PRIVATE_KEY"],
+    "PAYDUNYA-TOKEN": PAYDUNYA_CONFIG["TOKEN"],
+}
+
+# On peut utiliser MODE test ou live en fonction de l'environnement, ici debug est True par défaut comme initialement
+paydunya.debug = True
+
+PAYDUNYA_CALLBACK_URL = f"{BACKEND_URL}/api/v1/paiements/ipn/"
