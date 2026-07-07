@@ -223,6 +223,13 @@ LOGGING["loggers"]["anymail"] = {
 }
 
 
+LOGGING["loggers"]["django.core.mail"] = {
+    "level": "DEBUG",
+    "handlers": ["console"],
+    "propagate": False,
+}
+
+
 
 
 # Sentry
