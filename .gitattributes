@@ -1,1 +1,40 @@
+# Default: auto-detect
 * text=auto
+
+# Shell scripts — MUST use LF (Unix line endings) or Docker exec format error
+*.sh text eol=lf
+compose/**/start text eol=lf
+compose/**/entrypoint text eol=lf
+compose/**/Dockerfile text eol=lf
+Dockerfile text eol=lf
+
+# Python files — LF
+*.py text eol=lf
+
+# Web / config files — LF
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary files — no conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.gz binary
