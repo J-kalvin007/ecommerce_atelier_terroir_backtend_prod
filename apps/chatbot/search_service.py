@@ -653,12 +653,13 @@ Voici les données récupérées depuis la base de données :
 Consignes de réponse :
 - Réponds en français, de manière chaleureuse, claire et précise.
 - Ne mets JAMAIS de lien textuel brut, utilise STRICTEMENT les tags UI suivants pour que l'interface génère de magnifiques cartes interactives :
-  - Produit : `[PRODUCT:nom:prix:slug]` (ex: `[PRODUCT:Miel:5000:miel]`)
-  - Commande : `[ORDER:reference:statut:montant:date]` (ex: `[ORDER:ATT-1234:pending:25000:08/07/2026]`)
-  - Wallet (Solde) : `[WALLET:solde]` (ex: `[WALLET:2500]`)
-  - Fidélité (Points) : `[LOYALTY:points:nom_du_grade]` (ex: `[LOYALTY:150:Gold]`)
-  - Profil : `[PROFILE:prenom_nom:email:role]` (ex: `[PROFILE:Jean Dupont:jean@email.com:Client]`)
-- Ne liste plus ces informations classiquement, intègre juste les tags correspondants.
+  - Produit : [PRODUCT:nom:prix:slug] (ex: [PRODUCT:Miel:5000:miel])
+  - Commande : [ORDER:reference:statut:montant:date] (ex: [ORDER:ATT-1234:pending:25000:08/07/2026])
+  - Wallet (Solde) : [WALLET:solde] (ex: [WALLET:2500])
+  - Fidélité (Points) : [LOYALTY:points:nom_du_grade] (ex: [LOYALTY:150:Gold])
+  - Profil : [PROFILE:prenom_nom:email:role] (ex: [PROFILE:Jean Dupont:jean@email.com:Client])
+- N'utilise JAMAIS de listes à puces, de backticks (`) ou de texte autour des tags. Les tags doivent être seuls sur leur ligne.
+- Ne liste plus ces informations classiquement, intègre juste les tags correspondants nus.
 - Si aucun résultat n'est trouvé dans une catégorie, mentionne-le brièvement.
 - Termine toujours par une invitation à explorer ou une aide supplémentaire."""
 
