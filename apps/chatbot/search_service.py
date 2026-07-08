@@ -652,16 +652,14 @@ Voici les données récupérées depuis la base de données :
 
 Consignes de réponse :
 - Réponds en français, de manière chaleureuse, claire et précise.
-- Présente les résultats de manière structurée et lisible (listes, emojis pertinents).
-- Pour les produits : indique le nom, le prix, le stock, la note et le lien.
-- Pour les commandes : indique la référence, le statut, le total et la date.
-- Pour le wallet : indique clairement le solde disponible et les dernières opérations.
-- Pour la fidélité : indique les points et le palier actuel.
-- Si des produits sont en solde, mets-le en avant.
-- Utilise des emojis appropriés pour rendre la réponse visuellement agréable.
-- Ajoute des liens cliquables vers les pages concernées.
+- Ne mets JAMAIS de lien textuel brut, utilise STRICTEMENT les tags UI suivants pour que l'interface génère de magnifiques cartes interactives :
+  - Produit : `[PRODUCT:nom:prix:slug]` (ex: `[PRODUCT:Miel:5000:miel]`)
+  - Commande : `[ORDER:reference:statut:montant:date]` (ex: `[ORDER:ATT-1234:pending:25000:08/07/2026]`)
+  - Wallet (Solde) : `[WALLET:solde]` (ex: `[WALLET:2500]`)
+  - Fidélité (Points) : `[LOYALTY:points:nom_du_grade]` (ex: `[LOYALTY:150:Gold]`)
+  - Profil : `[PROFILE:prenom_nom:email:role]` (ex: `[PROFILE:Jean Dupont:jean@email.com:Client]`)
+- Ne liste plus ces informations classiquement, intègre juste les tags correspondants.
 - Si aucun résultat n'est trouvé dans une catégorie, mentionne-le brièvement.
-- Ne répète jamais les données brutes JSON, reformule-les toujours en langage naturel.
 - Termine toujours par une invitation à explorer ou une aide supplémentaire."""
 
         try:
@@ -691,8 +689,7 @@ Consignes de réponse :
             if products:
                 lines.append(f"📦 **{len(products)} produit(s) trouvé(s) :**")
                 for p in products:
-                    stock_icon = "✅" if p["is_in_stock"] else "❌"
-                    lines.append(f"  • {p['name']} — {p['price']} FCFA {stock_icon} — [{p['url']}]({p['url']})")
+                    lines.append(f"[PRODUCT:{p.get('name')}:{p.get('price')}:{p.get('slug')}]")
             else:
                 lines.append("📦 Aucun produit trouvé.")
 
@@ -701,19 +698,23 @@ Consignes de réponse :
             if orders:
                 lines.append(f"\n🛍️ **{len(orders)} commande(s) :**")
                 for o in orders:
-                    lines.append(f"  • {o['reference']} — {o['status']} — {o['total_final']} FCFA ({o['date']})")
+                    lines.append(f"[ORDER:{o.get('reference')}:{o.get('status')}:{o.get('total_final')}:{o.get('created_at')}]")
             else:
                 lines.append("\n🛍️ Aucune commande.")
 
         if "wallet" in raw_data:
             w = raw_data["wallet"]
             if "balance" in w:
-                lines.append(f"\n💰 **Wallet :** {w['balance']} FCFA ({w['status']})")
+                lines.append(f"\n[WALLET:{w.get('balance')}]")
 
         if "loyalty" in raw_data:
             loy = raw_data["loyalty"]
             if "points_balance" in loy:
-                lines.append(f"\n⭐ **Fidélité :** {loy['points_balance']} pts — Palier : {loy['palier']}")
+                lines.append(f"\n[LOYALTY:{loy.get('points_balance')}:{loy.get('palier')}]")
+                
+        if "profile" in raw_data:
+            p = raw_data["profile"]
+            lines.append(f"\n[PROFILE:{p.get('first_name')} {p.get('last_name')}:{p.get('email')}:{p.get('role')}]")
 
         lines.append("\n_Puis-je vous aider autrement ?_")
         return "\n".join(lines)
