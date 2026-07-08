@@ -78,6 +78,10 @@ INTENT_KEYWORDS: dict[str, list[str]] = {
         "newsletter", "abonnement", "désabonnement", "contact", "message", "nous contacter",
         "support", "aide", "notification", "alerte", "mail", "email", "courriel", "question",
     ],
+    "profile": [
+        "profil", "mon compte", "mes infos", "mes informations", "mes coordonnées", "coordonnées",
+        "qui suis-je", "identifiant", "email", "téléphone", "mon adresse",
+    ],
     "admin_users": [
         "utilisateur", "client", "inscription", "compte", "membre", "profil", "rôle", "permission",
         "tous les", "global", "plateforme", "admin", "administrateur", "gestion", "staff",
@@ -201,6 +205,9 @@ class AISearchService:
             elif intent == "notifications":
                 raw_data["notifications"] = self._query_notifications()
 
+            elif intent == "profile" and self.role != ROLE_ANONYMOUS:
+                raw_data["profile"] = self._query_profile()
+
             elif intent == "admin_users" and self.role == ROLE_ADMIN:
                 raw_data["admin_users"] = self._query_admin_users()
 
@@ -208,7 +215,7 @@ class AISearchService:
                 raw_data["admin_stats"] = self._query_admin_stats()
 
             # Si l'utilisateur demande des données privées mais n'est pas connecté
-            elif intent in ("orders", "wallet", "loyalty", "deliveries", "payments") and self.role == ROLE_ANONYMOUS:
+            elif intent in ("orders", "wallet", "loyalty", "deliveries", "payments", "profile") and self.role == ROLE_ANONYMOUS:
                 raw_data["auth_required"] = True
 
         total_results = sum(
@@ -232,21 +239,21 @@ class AISearchService:
         """Retourne la liste des codes promo actifs."""
         from apps.promotions.models import PromoCode
         from django.utils import timezone as tz
+        from django.db.models import Q
 
         now = tz.now()
         codes = PromoCode.objects.filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gte=now),
             is_active=True,
-            valid_from__lte=now,
-            valid_until__gte=now,
-        ).order_by("valid_until")
+            starts_at__lte=now,
+        ).order_by("starts_at")
 
         return [
             {
                 "code": c.code,
-                "type": c.discount_type,
-                "value": f"{c.discount_value}",
-                "min_purchase": f"{c.min_purchase_amount} FCFA" if c.min_purchase_amount else "Aucun",
-                "until": c.valid_until.strftime("%d/%m/%Y"),
+                "type": c.type,
+                "value": f"{c.value}",
+                "until": c.expires_at.strftime("%d/%m/%Y") if c.expires_at else "Illimité",
                 "description": c.description or "",
             }
             for c in codes
@@ -260,6 +267,17 @@ class AISearchService:
             return {"admin_unread_messages": unread_count}
         return {
             "info": "Vous pouvez vous abonner à notre newsletter depuis le pied de page du site. Pour nous contacter, utilisez le formulaire de contact sur la page 'Contact'. Nos équipes vous répondront rapidement."
+        }
+
+    def _query_profile(self) -> dict:
+        """Retourne les informations du profil de l'utilisateur."""
+        if not self.user:
+            return {}
+        return {
+            "email": self.user.email,
+            "first_name": getattr(self.user, "first_name", ""),
+            "last_name": getattr(self.user, "last_name", ""),
+            "role": self.role,
         }
 
     def _query_products(self) -> list[dict]:

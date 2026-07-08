@@ -495,23 +495,23 @@ RÈGLES DE COMMUNICATION
         """
         from apps.promotions.models import PromoCode
         from django.utils import timezone
+        from django.db.models import Q
 
         now = timezone.now()
         codes = PromoCode.objects.filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gte=now),
             is_active=True,
-            valid_from__lte=now,
-            valid_until__gte=now,
-        ).order_by("valid_until")
+            starts_at__lte=now,
+        ).order_by("starts_at")
 
         results = []
         for c in codes:
             results.append({
                 "code": c.code,
-                "discount_type": c.discount_type,
-                "discount_value": str(c.discount_value),
-                "min_purchase_amount": f"{c.min_purchase_amount} FCFA" if c.min_purchase_amount else None,
+                "discount_type": c.type,
+                "discount_value": str(c.value),
                 "description": c.description or "",
-                "valid_until": c.valid_until.strftime("%d/%m/%Y"),
+                "valid_until": c.expires_at.strftime("%d/%m/%Y") if c.expires_at else "Illimité",
             })
 
         return json.dumps({"active_promo_codes": results}, ensure_ascii=False)

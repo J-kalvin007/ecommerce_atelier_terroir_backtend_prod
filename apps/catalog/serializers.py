@@ -176,13 +176,10 @@ class ProductListSerializer(serializers.ModelSerializer):
         )
 
     def get_primary_image(self, obj):
-        image = obj.images.filter(
-            is_primary=True
-        ).first()
-
-        if image:
-            return ProductImageSerializer(image, context=self.context).data
-
+        # Utiliser all() pour bénéficier de prefetch_related("images")
+        for image in obj.images.all():
+            if image.is_primary:
+                return ProductImageSerializer(image, context=self.context).data
         return None
 
 
