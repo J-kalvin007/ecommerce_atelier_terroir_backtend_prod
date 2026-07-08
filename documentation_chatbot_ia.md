@@ -24,7 +24,7 @@ Le module nécessite l'installation du SDK Python d'OpenAI et la configuration d
 ### Variables d'environnement (`ecommerce_backend/.envs/.local/.env` ou en prod)
 ```env
 OPENAI_API_KEY=sk-proj-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-OPENAI_MODEL=gpt-4o-mini  # (Optionnel, "gpt-4o-mini" par défaut pour le rapport qualité/prix)
+OPENAI_MODEL=openai/gpt-4o-mini # (Optionnel, "openai/gpt-4o-mini" par défaut pour le rapport qualité/prix)
 ```
 
 ### Dépendances Python

@@ -506,8 +506,9 @@ PAYDUNYA_CALLBACK_URL = f"{BACKEND_URL}/api/v1/paiements/ipn/"
 # Clé API OpenAI — À définir dans la variable d'environnement OPENAI_API_KEY
 # Ne jamais mettre la clé en dur dans le code source.
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+OPENAI_API_BASE = env("OPENAI_API_BASE", default="https://api.openai.com/v1")
 
 # Modèle OpenAI à utiliser pour le chatbot.
-# gpt-4o-mini est le rapport qualité/coût optimal pour un chatbot e-commerce.
+# openai/gpt-4o-mini est le rapport qualité/coût optimal pour un chatbot e-commerce.
 # Peut être remplacé par "gpt-4o" pour des réponses plus riches.
-OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
+OPENAI_MODEL = env("OPENAI_MODEL", default="openai/gpt-4o-mini")

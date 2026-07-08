@@ -171,7 +171,7 @@ Ce module transforme l'API en une interface conversationnelle intelligente, dot�
 
 - **Persistance et Mémoire** : Les conversations sont stockées via les modèles `Conversation` et `Message`. L'historique permet à l'IA de comprendre le contexte.
 - **Contexte Coulissant (`ChatService`)** : Le service extrait uniquement les **10 derniers messages** d'une `Conversation`. Cela préserve le contexte (ex: "Et le deuxième produit dont tu parlais ?") tout en évitant d'exploser la limite de tokens d'OpenAI et de générer des factures astronomiques.
-- **OpenAI Function Calling (`api_definitions.py`)** : Le modèle LLM (gpt-4o-mini) ne se contente pas de générer du texte. Il reçoit en pré-prompt le schéma technique de l'application via des spécifications JSON Schema.
+- **OpenAI Function Calling (`api_definitions.py`)** : Le modèle LLM (openai/gpt-4o-mini) ne se contente pas de générer du texte. Il reçoit en pré-prompt le schéma technique de l'application via des spécifications JSON Schema.
 - **Flux d'exécution IA** : 
   1. L'utilisateur demande : *"Combien ai-je sur mon compte Wallet ?"*.
   2. L'IA analyse et répond (en JSON caché) : *"Je dois exécuter la fonction `get_wallet_balance()`"*.
@@ -252,7 +252,7 @@ DJANGO_DEFAULT_FROM_EMAIL="Atelier du Terroir <contact@atelierduterroir.com>"
 # 6. INTELLIGENCE ARTIFICIELLE (OPENAI)
 # ==========================================
 OPENAI_API_KEY="sk-proj-<ta_cle_api_openai>"
-OPENAI_MODEL="gpt-4o-mini"
+OPENAI_MODEL="openai/gpt-4o-mini"
 ```
 
 ### Séquence Stricte de Déploiement CI/CD

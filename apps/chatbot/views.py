@@ -118,20 +118,24 @@ class ChatView(APIView):
         except openai.AuthenticationError:
             logger.error("ChatView: clé API OpenAI invalide ou non configurée.")
             return Response(
-                {"detail": "Le service IA n'est pas correctement configuré. Contactez l'administrateur."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                {"message": "Le service IA n'est pas correctement configuré. Veuillez contacter l'administrateur."},
+                status=status.HTTP_200_OK,
             )
-        except openai.RateLimitError:
-            logger.warning("ChatView: limite de débit OpenAI atteinte.")
+        except openai.RateLimitError as exc:
+            logger.warning("ChatView: limite de débit OpenAI atteinte. %s", str(exc))
+            error_message = "Le service IA est momentanément surchargé. Veuillez réessayer dans quelques instants."
+            if "insufficient_quota" in str(exc):
+                error_message = "Désolé, le service est temporairement indisponible en raison d'un dépassement de quota (crédits épuisés)."
+            
             return Response(
-                {"detail": "Le service IA est momentanément surchargé. Veuillez réessayer dans quelques instants."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                {"message": error_message},
+                status=status.HTTP_200_OK,
             )
         except openai.OpenAIError as exc:
             logger.error("ChatView: erreur OpenAI inattendue — %s", str(exc))
             return Response(
-                {"detail": "Le chatbot IA est momentanément indisponible. Veuillez réessayer."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                {"message": "Le chatbot IA est momentanément indisponible suite à une erreur technique. Veuillez nous excuser pour la gêne occasionnée."},
+                status=status.HTTP_200_OK,
             )
 
         # --- 4. Sérialisation et retour de la réponse ---

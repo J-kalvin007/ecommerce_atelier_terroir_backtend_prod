@@ -49,8 +49,11 @@ class ChatService:
 
     def __init__(self, user=None) -> None:
         self.user = user
-        self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")
+        self.client = openai.OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=getattr(settings, "OPENAI_API_BASE", "https://api.openai.com/v1"),
+        )
+        self.model = getattr(settings, "OPENAI_MODEL", "openai/gpt-4o-mini")
 
     # ============================================================
     #  POINT D'ENTRÉE PUBLIC
