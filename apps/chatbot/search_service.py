@@ -82,6 +82,18 @@ INTENT_KEYWORDS: dict[str, list[str]] = {
         "profil", "mon compte", "mes infos", "mes informations", "mes coordonnées", "coordonnées",
         "qui suis-je", "identifiant", "email", "téléphone", "mon adresse",
     ],
+    "favorites": [
+        "favori", "favoris", "j'aime", "sauvegardé", "wishlist", "liste de souhaits", "préféré", "prefere",
+    ],
+    "ratings": [
+        "avis", "note", "évaluation", "evaluation", "commentaire", "étoile", "etoile", "feedback",
+    ],
+    "delivery_fees": [
+        "frais de port", "coût de livraison", "frais de livraison", "zone de livraison", "tarif livraison", "prix livraison",
+    ],
+    "banners": [
+        "nouveauté", "nouveaute", "à la une", "vedette", "bannière", "annonce", "campagne", "mise en avant",
+    ],
     "admin_users": [
         "utilisateur", "client", "inscription", "compte", "membre", "profil", "rôle", "permission",
         "tous les", "global", "plateforme", "admin", "administrateur", "gestion", "staff",
@@ -208,6 +220,18 @@ class AISearchService:
             elif intent == "profile" and self.role != ROLE_ANONYMOUS:
                 raw_data["profile"] = self._query_profile()
 
+            elif intent == "favorites" and self.role != ROLE_ANONYMOUS:
+                raw_data["favorites"] = self._query_favorites()
+
+            elif intent == "ratings":
+                raw_data["ratings"] = self._query_ratings()
+
+            elif intent == "delivery_fees":
+                raw_data["delivery_fees"] = self._query_delivery_fees()
+
+            elif intent == "banners":
+                raw_data["banners"] = self._query_banners()
+
             elif intent == "admin_users" and self.role == ROLE_ADMIN:
                 raw_data["admin_users"] = self._query_admin_users()
 
@@ -215,7 +239,7 @@ class AISearchService:
                 raw_data["admin_stats"] = self._query_admin_stats()
 
             # Si l'utilisateur demande des données privées mais n'est pas connecté
-            elif intent in ("orders", "wallet", "loyalty", "deliveries", "payments", "profile") and self.role == ROLE_ANONYMOUS:
+            elif intent in ("orders", "wallet", "loyalty", "deliveries", "payments", "profile", "favorites") and self.role == ROLE_ANONYMOUS:
                 raw_data["auth_required"] = True
 
         total_results = sum(
@@ -279,6 +303,32 @@ class AISearchService:
             "last_name": getattr(self.user, "last_name", ""),
             "role": self.role,
         }
+
+    def _query_favorites(self) -> list:
+        """Retourne la liste des produits favoris de l'utilisateur."""
+        if not self.user:
+            return []
+        from apps.catalog.models import Favorite
+        favs = Favorite.objects.filter(user=self.user, is_active=True).select_related("product")
+        return [f.product.name for f in favs]
+
+    def _query_ratings(self) -> list:
+        """Retourne les derniers avis globaux."""
+        from apps.catalog.models import Rating
+        ratings = Rating.objects.filter(is_active=True, is_verified=True).order_by("-created_at")[:5]
+        return [{"produit": r.product.name, "note": r.rating, "commentaire": r.comment} for r in ratings]
+
+    def _query_delivery_fees(self) -> list:
+        """Retourne les informations des frais de livraison."""
+        from apps.livraisons.models import FraisLivraison
+        frais = FraisLivraison.objects.filter(is_active=True)
+        return [{"zone": f.zone, "prix": f"{f.montant} FCFA"} for f in frais]
+
+    def _query_banners(self) -> list:
+        """Retourne les annonces/bannières à la une."""
+        from apps.promotions.models import Banner
+        banners = Banner.objects.filter(is_active=True)
+        return [{"titre": b.title, "description": b.description or ""} for b in banners]
 
     def _query_products(self) -> list[dict]:
         """Recherche de produits actifs correspondant à la requête."""
