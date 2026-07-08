@@ -39,40 +39,52 @@ ROLE_ADMIN = "platform_admin"
 # Cartographie des intentions → mots-clés (FR + variantes)
 INTENT_KEYWORDS: dict[str, list[str]] = {
     "products": [
-        "produit", "article", "catalogue", "catégorie", "categorie",
-        "bio", "stock", "dispo", "prix", "solde", "promo", "promotion",
-        "top", "favori", "note", "mieux", "populaire", "tendance",
-        "frais", "légume", "fruit", "huile", "épice", "spice", "tubercule",
-        "feuille", "viande", "poisson", "lait", "fromage",
+        "produit", "article", "catalogue", "catégorie", "categorie", "image", "variante",
+        "bio", "stock", "dispo", "prix", "top", "favori", "note", "mieux", "avis", "évaluation", "evaluation",
+        "populaire", "tendance", "frais", "légume", "fruit", "huile", "épice",
+        "spice", "tubercule", "feuille", "viande", "poisson", "lait", "fromage",
+        "miel", "arachide", "céréale", "boisson", "jus", "farine", "piment", "savon",
+        "recherche", "voir", "acheter", "liste", "tout", "tous", "rayon", "boutique", "magasin",
+    ],
+    "promos": [
+        "promo", "promotion", "solde", "réduction", "reduction", "coupon",
+        "code", "remise", "cadeau", "offert", "gratuit", "bon plan", "deal",
+        "moins cher", "rabais", "avantage", "flash", "bannière",
     ],
     "orders": [
-        "commande", "achat", "commander", "acheté", "livré", "livraison",
-        "statut", "expédié", "annulé", "remboursé", "référence", "réf",
-        "récente", "dernière", "historique",
+        "commande", "achat", "commander", "acheté", "order", "panier", "cart",
+        "statut", "expédié", "annulé", "remboursé", "référence", "réf", "item", "article commandé",
+        "récente", "dernière", "historique", "mes achats", "suivre ma commande",
     ],
     "wallet": [
-        "wallet", "portefeuille", "solde", "recharge", "argent",
-        "balance", "crédit", "compte",
+        "wallet", "portefeuille", "solde", "recharge", "argent", "fonds", "cagnotte",
+        "balance", "crédit", "compte", "débit", "transaction wallet", "historique wallet",
     ],
     "loyalty": [
-        "fidélité", "fidelite", "points", "palier", "vip",
-        "bronze", "silver", "gold", "elite", "récompense",
+        "fidélité", "fidelite", "points", "palier", "vip", "grade", "niveau", "statut vip",
+        "bronze", "silver", "gold", "elite", "récompense", "avantage", "gain", "programme",
     ],
     "deliveries": [
-        "livraison", "livreur", "suivi", "colis", "tracking",
-        "délai", "délais", "adresse", "estimée",
+        "livraison", "livreur", "suivi", "colis", "tracking", "adresse", "expédition",
+        "délai", "délais", "estimée", "date de livraison", "frais de port", "transport",
+        "livré", "en transit", "préparation", "zone", "pays", "ville", "expédition",
     ],
     "payments": [
-        "paiement", "payé", "transaction", "facture", "paydunya",
-        "virement", "cashback",
+        "paiement", "payé", "transaction", "facture", "paydunya", "mobile money",
+        "virement", "cashback", "carte", "visa", "mastercard", "moyen de paiement",
+        "règlement", "payer", "prix total", "tva", "taxe",
+    ],
+    "notifications": [
+        "newsletter", "abonnement", "désabonnement", "contact", "message", "nous contacter",
+        "support", "aide", "notification", "alerte", "mail", "email", "courriel", "question",
     ],
     "admin_users": [
-        "utilisateur", "client", "inscription", "compte", "membre",
-        "tous les", "global", "plateforme",
+        "utilisateur", "client", "inscription", "compte", "membre", "profil", "rôle", "permission",
+        "tous les", "global", "plateforme", "admin", "administrateur", "gestion", "staff",
     ],
     "admin_stats": [
-        "chiffre", "affaire", "revenu", "bénéfice", "statistique",
-        "total", "résumé", "rapport", "dashboard", "vue globale",
+        "chiffre", "affaire", "revenu", "bénéfice", "statistique", "kpi", "métrique", "metric",
+        "total", "résumé", "rapport", "dashboard", "vue globale", "ventes", "performance",
     ],
 }
 
@@ -168,6 +180,9 @@ class AISearchService:
             if intent == "products":
                 raw_data["products"] = self._query_products()
 
+            elif intent == "promos":
+                raw_data["promos"] = self._query_promos()
+
             elif intent == "orders" and self.role != ROLE_ANONYMOUS:
                 raw_data["orders"] = self._query_orders()
 
@@ -182,6 +197,9 @@ class AISearchService:
 
             elif intent == "payments" and self.role != ROLE_ANONYMOUS:
                 raw_data["payments"] = self._query_payments()
+
+            elif intent == "notifications":
+                raw_data["notifications"] = self._query_notifications()
 
             elif intent == "admin_users" and self.role == ROLE_ADMIN:
                 raw_data["admin_users"] = self._query_admin_users()
@@ -209,6 +227,40 @@ class AISearchService:
     # =========================================================================
     #  REQUÊTES ORM — DONNÉES PUBLIQUES
     # =========================================================================
+
+    def _query_promos(self) -> list[dict]:
+        """Retourne la liste des codes promo actifs."""
+        from apps.promotions.models import PromoCode
+        from django.utils import timezone as tz
+
+        now = tz.now()
+        codes = PromoCode.objects.filter(
+            is_active=True,
+            valid_from__lte=now,
+            valid_until__gte=now,
+        ).order_by("valid_until")
+
+        return [
+            {
+                "code": c.code,
+                "type": c.discount_type,
+                "value": f"{c.discount_value}",
+                "min_purchase": f"{c.min_purchase_amount} FCFA" if c.min_purchase_amount else "Aucun",
+                "until": c.valid_until.strftime("%d/%m/%Y"),
+                "description": c.description or "",
+            }
+            for c in codes
+        ]
+
+    def _query_notifications(self) -> dict:
+        """Retourne des informations générales de contact/newsletter, ou admin."""
+        if self.role == ROLE_ADMIN:
+            from apps.notifications.models import ContactMessage
+            unread_count = ContactMessage.objects.filter(is_read=False).count()
+            return {"admin_unread_messages": unread_count}
+        return {
+            "info": "Vous pouvez vous abonner à notre newsletter depuis le pied de page du site. Pour nous contacter, utilisez le formulaire de contact sur la page 'Contact'. Nos équipes vous répondront rapidement."
+        }
 
     def _query_products(self) -> list[dict]:
         """Recherche de produits actifs correspondant à la requête."""

@@ -61,6 +61,18 @@ class RecommendationService:
             # Anonyme → recommandations populaires
             return self._popular_recommendations()
 
+    def _format_product(self, p) -> dict:
+        """Formate le produit pour le frontend sans serializer complet."""
+        primary = p.images.filter(is_primary=True).first()
+        return {
+            "id": str(p.id),
+            "name": p.name,
+            "slug": p.slug,
+            "price": float(p.price) if p.price else 0.0,
+            "category": p.category.name if p.category else None,
+            "primary_image": primary.image.url if primary and primary.image else None,
+        }
+
     # =========================================================================
     #  RECOMMANDATIONS PERSONNALISÉES
     # =========================================================================
@@ -140,7 +152,7 @@ class RecommendationService:
 
         return [
             {
-                "product_id": str(p.id),
+                "product": self._format_product(p),
                 "reason": (
                     f"Basé sur votre achat de {most_ordered_product_name}, "
                     f"vous aimerez sûrement ces produits de la catégorie {target_category.name}."
@@ -180,7 +192,7 @@ class RecommendationService:
 
         return [
             {
-                "product_id": str(p.id),
+                "product": self._format_product(p),
                 "reason": f"{reason_prefix} — {p.order_count} commandes, {p.count_favorites} favoris, ⭐ {p.note_produit}/5",
                 "score": round(self._compute_score(p), 4),
             }

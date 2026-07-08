@@ -311,6 +311,7 @@ RÈGLES ABSOLUES ET NON NÉGOCIABLES (INTERDICTION DE DÉROGER)
       et la Carte bancaire via PayDunya."
 
 2. DEVISE — FCFA EXCLUSIVEMENT :
+   ⛔ C'EST UNE ERREUR GRAVE D'UTILISER L'EURO (€) OU LE DOLLAR ($).
    ⛔ TOUS les prix doivent être affichés UNIQUEMENT en FCFA (Franc CFA).
    ⛔ Ne JAMAIS convertir, afficher ou mentionner des prix en EUR, USD, ou toute
       autre devise. Si les données fournies par les fonctions internes indiquent
@@ -318,10 +319,14 @@ RÈGLES ABSOLUES ET NON NÉGOCIABLES (INTERDICTION DE DÉROGER)
    ✅ Format correct : "1 500 FCFA", "25 000 FCFA"
    ⛔ Format interdit : "1.50€", "$25", "1500 EUR"
 
-3. PÉRIMÈTRE DE RÉPONSE :
+3. FORMAT OBLIGATOIRE DES RECOMMANDATIONS PRODUITS ET COMMANDES :
+   Pour chaque produit que tu recommandes, tu DOIS STRICTEMENT utiliser le format suivant :
+   "- **[Nom du Produit]** — [Prix] FCFA (slug: [slug_du_produit])"
+   L'inclusion exacte du texte "(slug: ...)" est INDISPENSABLE pour que l'interface génère une carte cliquable. Ne l'oublie jamais.
+
+4. PÉRIMÈTRE DE RÉPONSE :
    - Ne te prononce JAMAIS sur des sujets sans rapport avec la boutique.
-   - Si l'utilisateur pose une question hors sujet (météo, politique, etc.),
-     réponds poliment que tu es dédié à L'Atelier du Terroir uniquement.
+   - Si l'utilisateur pose une question hors sujet, réponds poliment que tu es dédié à L'Atelier du Terroir uniquement.
 
 ═══════════════════════════════════════════════════════════
 RÈGLES DE COMMUNICATION
@@ -369,6 +374,7 @@ RÈGLES DE COMMUNICATION
         FUNCTION_ROUTER = {
             "search_products": self._api_search_products,
             "get_categories": self._api_get_categories,
+            "get_active_promo_codes": self._api_get_active_promo_codes,
             "get_my_orders": self._api_get_my_orders,
             "get_wallet_balance": self._api_get_wallet_balance,
             "get_loyalty_points": self._api_get_loyalty_points,
@@ -482,6 +488,33 @@ RÈGLES DE COMMUNICATION
         ]
 
         return json.dumps({"categories": results}, ensure_ascii=False)
+
+    def _api_get_active_promo_codes(self, args: dict) -> str:
+        """
+        Retourne la liste des codes promo actifs.
+        """
+        from apps.promotions.models import PromoCode
+        from django.utils import timezone
+
+        now = timezone.now()
+        codes = PromoCode.objects.filter(
+            is_active=True,
+            valid_from__lte=now,
+            valid_until__gte=now,
+        ).order_by("valid_until")
+
+        results = []
+        for c in codes:
+            results.append({
+                "code": c.code,
+                "discount_type": c.discount_type,
+                "discount_value": str(c.discount_value),
+                "min_purchase_amount": f"{c.min_purchase_amount} FCFA" if c.min_purchase_amount else None,
+                "description": c.description or "",
+                "valid_until": c.valid_until.strftime("%d/%m/%Y"),
+            })
+
+        return json.dumps({"active_promo_codes": results}, ensure_ascii=False)
 
     # ============================================================
     #  FONCTIONS AUTHENTIFIÉES (requièrent self.user != None)

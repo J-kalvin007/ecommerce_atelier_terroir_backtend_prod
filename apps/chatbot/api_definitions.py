@@ -126,4 +126,21 @@ API_FUNCTIONS: list[dict] = [
             "properties": {},
         },
     },
+
+    # ----------------------------------------------------------
+    # PROMOTIONS — Endpoints publics
+    # ----------------------------------------------------------
+
+    {
+        "name": "get_active_promo_codes",
+        "description": (
+            "Récupère la liste des codes promotionnels et réductions actuellement actifs et valides. "
+            "Utilise cette fonction quand l'utilisateur demande s'il y a des promotions, des soldes "
+            "ou s'il cherche un code promo."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
 ]

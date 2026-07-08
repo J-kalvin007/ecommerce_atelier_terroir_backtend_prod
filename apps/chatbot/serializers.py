@@ -133,7 +133,7 @@ class RecommendationProductInputSerializer(serializers.Serializer):
 
 class RecommendationSuggestionSerializer(serializers.Serializer):
     """Une suggestion de produit retournée par le service."""
-    product_id = serializers.CharField()
+    product = serializers.DictField(help_text="Les infos de base du produit recommandé")
     reason = serializers.CharField()
     score = serializers.FloatField(required=False, allow_null=True)
 
