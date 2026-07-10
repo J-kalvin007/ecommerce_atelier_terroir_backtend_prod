@@ -34,9 +34,11 @@ class RecommendationService:
 
     MAX_RECOMMENDATIONS = 6
 
-    def __init__(self, user=None, products_payload: list[dict] | None = None) -> None:
+    def __init__(self, user=None, products_payload: list[dict] | None = None, viewed_categories: list[str] | None = None, user_intent: str = "") -> None:
         self.user = user
         self.products_payload = products_payload or []
+        self.viewed_categories = viewed_categories or []
+        self.user_intent = user_intent
 
     # =========================================================================
     #  POINT D'ENTRÉE
@@ -54,7 +56,10 @@ class RecommendationService:
         """
         from apps.catalog.models import Product
 
-        if self.user and not getattr(self.user, "is_anonymous", True):
+        if self.viewed_categories or self.user_intent:
+            # Contexte présent (utilisateur regarde un produit spécifique)
+            return self._contextual_recommendations()
+        elif self.user and not getattr(self.user, "is_anonymous", True):
             # Utilisateur connecté → recommandations personnalisées
             return self._personalized_recommendations()
         else:
@@ -72,6 +77,74 @@ class RecommendationService:
             "category": p.category.name if p.category else None,
             "primary_image": primary.image.url if primary and primary.image else None,
         }
+
+    # =========================================================================
+    #  RECOMMANDATIONS CONTEXTUELLES (page produit en cours)
+    # =========================================================================
+
+    def _contextual_recommendations(self) -> list[dict]:
+        """
+        Recommandations basées sur le produit ou la catégorie actuellement consultés.
+        Privilégie les produits de la même catégorie.
+        """
+        from apps.catalog.models import Product
+
+        # Extraire le nom du produit consulté depuis l'intention si présent
+        # Ex: "Je regarde le produit Viande Hachée Bio"
+        viewed_product_name = ""
+        if "Je regarde le produit " in self.user_intent:
+            viewed_product_name = self.user_intent.split("Je regarde le produit ")[-1].strip()
+
+        qs = Product.objects.filter(is_active=True, stock__gt=0).select_related("category")
+        
+        # Exclure le produit actuellement consulté
+        if viewed_product_name:
+            qs = qs.exclude(name__iexact=viewed_product_name)
+            
+        candidates = []
+        
+        # Essayer de trouver des produits dans les catégories vues
+        if self.viewed_categories:
+            cat_qs = qs.filter(category__name__in=self.viewed_categories)
+            # Trier par popularité
+            cat_candidates = list(cat_qs.only(
+                "id", "name", "slug", "price", "category",
+                "order_count", "count_favorites", "note_produit",
+                "is_top", "count_ratings",
+            ))
+            cat_candidates.sort(key=self._compute_score, reverse=True)
+            candidates.extend(cat_candidates[:self.MAX_RECOMMENDATIONS])
+            
+        # Si on n'a pas assez de recommandations contextuelles, on complète avec les populaires
+        if len(candidates) < self.MAX_RECOMMENDATIONS:
+            excluded_ids = [c.id for c in candidates]
+            if viewed_product_name:
+                # Filtrer le nom sur la db pour l'exclusion de sécurité
+                pass
+                
+            pop_qs = qs.exclude(id__in=excluded_ids)
+            pop_candidates = list(pop_qs.only(
+                "id", "name", "slug", "price", "category",
+                "order_count", "count_favorites", "note_produit",
+                "is_top", "count_ratings",
+            ))
+            pop_candidates.sort(key=self._compute_score, reverse=True)
+            candidates.extend(pop_candidates[:(self.MAX_RECOMMENDATIONS - len(candidates))])
+
+        results = []
+        for p in candidates:
+            is_contextual = self.viewed_categories and p.category and p.category.name in self.viewed_categories
+            reason = (
+                f"Suggéré car vous consultez la catégorie {p.category.name}."
+                if is_contextual else "Très apprécié par nos clients."
+            )
+            results.append({
+                "product": self._format_product(p),
+                "reason": reason,
+                "score": round(self._compute_score(p), 4),
+            })
+            
+        return results
 
     # =========================================================================
     #  RECOMMANDATIONS PERSONNALISÉES

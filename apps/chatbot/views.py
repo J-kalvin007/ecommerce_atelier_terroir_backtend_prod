@@ -257,18 +257,23 @@ class RecommendationView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         products_payload = serializer.validated_data.get("products", [])
+        viewed_categories = serializer.validated_data.get("viewed_categories", [])
+        user_intent = serializer.validated_data.get("user_intent", "")
         user = request.user if request.user.is_authenticated else None
 
         logger.info(
-            "RecommendationView: user=%s products_in_payload=%d",
+            "RecommendationView: user=%s products_in_payload=%d viewed_categories=%d",
             user.email if user else "anonyme",
             len(products_payload),
+            len(viewed_categories),
         )
 
         try:
             service = RecommendationService(
                 user=user,
                 products_payload=products_payload,
+                viewed_categories=viewed_categories,
+                user_intent=user_intent,
             )
             suggestions = service.get_recommendations()
         except Exception as exc:

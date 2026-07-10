@@ -326,21 +326,23 @@ RÈGLES ABSOLUES ET NON NÉGOCIABLES (INTERDICTION DE DÉROGER)
    - N'utilise JAMAIS de listes à puces (ni tiret -, ni astérisque *) pour les tags.
    - N'ajoute JAMAIS de backticks (`), de guillemets ou de code blocks autour des tags.
    - N'ajoute AUCUN texte supplémentaire sur la même ligne (pas de prix initial, de remise ou de date de validité à côté). Juste le tag nu.
-   - Produit : `[PRODUCT:nom_du_produit:prix:slug]` (Exemple correct : [PRODUCT:Gombo:600:gombo])
+   - Produit : `[PRODUCT:nom_du_produit:prix:slug:image_url]` (Exemple correct : [PRODUCT:Gombo:600:gombo:/media/products/gombo.jpg])
    - Commande : `[ORDER:reference:statut:montant:date]` (Exemple correct : [ORDER:ATT-1234:pending:25000:08/07/2026])
    - Wallet (Solde) : `[WALLET:solde]` (Exemple correct : [WALLET:2500])
    - Fidélité (Points) : `[LOYALTY:points:nom_du_grade]` (Exemple correct : [LOYALTY:150:Gold])
    - Profil : `[PROFILE:prenom_nom:email:role]` (Exemple correct : [PROFILE:Jean Dupont:jean@email.com:Client])
 
-4. PÉRIMÈTRE DE RÉPONSE :
+4. PÉRIMÈTRE DE RÉPONSE ET RICHESSE DES DÉTAILS :
    - Ne te prononce JAMAIS sur des sujets sans rapport avec la boutique.
    - Si l'utilisateur pose une question hors sujet, réponds poliment que tu es dédié à L'Atelier du Terroir uniquement.
+   - Lors de la présentation d'un produit, utilise sa description complète pour mettre en valeur ses caractéristiques clés (ex: goût, bienfaits, conseils d'utilisation) sans être trop verbeux. Sois précis et attractif.
 
 ═══════════════════════════════════════════════════════════
 RÈGLES DE COMMUNICATION
 ═══════════════════════════════════════════════════════════
 - Réponds TOUJOURS en français, de manière chaleureuse, professionnelle et concise.
-- Utilise les tags UI pour rendre l'expérience sublime (ex: [PRODUCT:Miel:5000:miel]).
+- Utilise les tags UI pour rendre l'expérience sublime (ex: [PRODUCT:Miel:5000:miel:/media/products/miel.jpg]).
+- Si l'image n'est pas disponible (None ou null), utilise "null" dans le tag : [PRODUCT:Miel:5000:miel:null].
 - Utilise les données réelles via les fonctions disponibles pour les prix et stocks.
 - Si l'utilisateur pose une question ambiguë, reformule poliment pour clarifier."""
 
@@ -433,7 +435,7 @@ RÈGLES DE COMMUNICATION
         qs = Product.objects.filter(
             is_active=True,
             name__icontains=query,
-        ).select_related("category")
+        ).select_related("category").prefetch_related("images")
 
         # Filtre optionnel par catégorie
         if category_filter:
@@ -448,22 +450,26 @@ RÈGLES DE COMMUNICATION
                 "message": f"Aucun produit trouvé pour '{query}'.",
             })
 
-        results = [
-            {
+        results = []
+        for p in products:
+            primary_image = p.images.filter(is_primary=True).first()
+            image_url = primary_image.image.url if primary_image and primary_image.image else None
+            
+            results.append({
                 "id": str(p.id),
                 "name": p.name,
                 "category": p.category.name,
+                "description": p.description or "",
                 # Annotate currency explicitly so LLM never guesses
                 "price_fcfa": f"{p.price} FCFA",
                 "discount_price_fcfa": f"{p.discount_price} FCFA" if p.discount_price else None,
                 "stock": p.stock,
                 "in_stock": p.is_in_stock,
                 "slug": p.slug,
+                "primary_image": image_url,
                 # Lien vers la page produit du frontend
                 "url": f"/products/{p.slug}",
-            }
-            for p in products
-        ]
+            })
 
         return json.dumps({"found": len(results), "products": results}, ensure_ascii=False)
 
