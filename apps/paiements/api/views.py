@@ -183,6 +183,8 @@ def paydunya_webhook(request):
 
 
 class InitializePaydunyaPaymentView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request, *args, **kwargs):
 
         # Recuperation des donnees de la commande
