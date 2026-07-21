@@ -210,8 +210,9 @@ class Order(BaseModel):
         return str(self.numero_commande) if self.numero_commande else (str(self.reference) if self.reference else f"Commande #{self.pk} (sans référence)")
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
+        is_new = self._state.adding
         super().save(*args, **kwargs)
+        
         if is_new and not self.numero_commande:
             import datetime
             date_str = datetime.date.today().strftime('%Y%m%d')
@@ -227,7 +228,10 @@ class Order(BaseModel):
             elif nom:
                 initials = f"{nom[0:2].upper()}"
             
-            self.numero_commande = f"{initials}-{date_str}-{self.pk:04d}"
+            # Utiliser les 4 premiers caractères du UUID comme suffixe
+            uuid_part = str(self.pk).split('-')[0][:4].upper()
+            self.numero_commande = f"{initials}-{date_str}-{uuid_part}"
+            
             super().save(update_fields=['numero_commande'])
 
 
