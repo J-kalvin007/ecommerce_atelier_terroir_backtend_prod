@@ -30,3 +30,25 @@ def trigger_invoice_email_on_paid(sender, instance, created, **kwargs):
         # en base de données a été validée avec succès.
         transaction.on_commit(lambda: FactureEmailService.send_invoice_email(instance.order))
 
+@receiver(post_save, sender=OrderStatusHistory)
+def trigger_delivery_creation_on_paid(sender, instance, created, **kwargs):
+    """
+    Crée automatiquement une livraison lorsque le statut de la commande
+    passe à 'paid' et que la commande est marquée pour livraison.
+    """
+    if created and instance.new_status == 'paid':
+        order = instance.order
+        if order.is_for_delivery:
+            from apps.livraisons.models import Delivery, DeliveryStatus
+            
+            def create_delivery():
+                Delivery.objects.get_or_create(
+                    order=order,
+                    defaults={
+                        'status': DeliveryStatus.PENDING,
+                        'delivery_address': order.address_livraison,
+                        'notes': order.notes
+                    }
+                )
+                
+            transaction.on_commit(create_delivery)

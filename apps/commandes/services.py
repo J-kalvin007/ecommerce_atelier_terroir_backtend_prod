@@ -46,6 +46,7 @@ class OrderService:
         prenom_client="",
         email_client="",
         notes="",
+        is_for_delivery=True,
         frais_livraison=Decimal("0.00"),
         discount_amount=Decimal("0.00"),
     ):
@@ -119,6 +120,7 @@ class OrderService:
             city=city,
             country=country,
             notes=notes,
+            is_for_delivery=is_for_delivery,
             items_total=items_total,
             frais_livraison=Decimal(str(frais_livraison)),
             discount_amount=Decimal(str(discount_amount)),

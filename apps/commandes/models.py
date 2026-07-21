@@ -148,6 +148,11 @@ class Order(BaseModel):
 
     address_livraison = models.CharField(max_length=200)
 
+    is_for_delivery = models.BooleanField(
+        default=True,
+        help_text="Indique si la commande doit être livrée (True) ou retirée en boutique (False)."
+    )
+
     items_total = models.DecimalField(
         max_digits=12,
         decimal_places=2,

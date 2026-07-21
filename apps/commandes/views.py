@@ -50,6 +50,7 @@ class CheckoutAPIView(generics.GenericAPIView):
             notes=serializer.validated_data.get("notes", ""),
             frais_livraison=serializer.validated_data.get("frais_livraison", 0),
             discount_amount=serializer.validated_data.get("discount_amount", 0),
+            is_for_delivery=serializer.validated_data.get("is_for_delivery", True),
         )
 
         return Response(

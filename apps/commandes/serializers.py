@@ -25,6 +25,7 @@ class CheckoutSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     frais_livraison = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     discount_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
+    is_for_delivery = serializers.BooleanField(default=True)
     items = CheckoutItemSerializer(many=True)
 
     def validate_items(self, value):
@@ -73,6 +74,7 @@ class OrderListSerializer(serializers.ModelSerializer):
             "prenom_client",
             "email_client",
             "status",
+            "is_for_delivery",
             "items_total",
             "frais_livraison",
             "total_final",
@@ -100,6 +102,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "prenom_client",
             "email_client",
             "status",
+            "is_for_delivery",
             "address_livraison",
             "phone_livraison",
             "city",
