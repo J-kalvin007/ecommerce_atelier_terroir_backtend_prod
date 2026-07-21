@@ -76,16 +76,14 @@ class MyOrderListAPIView(generics.ListAPIView):
 
 class OrderDetailAPIView(generics.RetrieveAPIView):
     serializer_class = OrderDetailSerializer
-    permission_classes = [IsAuthenticated, IsCustomer | IsPlatformAdmin]
+    permission_classes = [AllowAny]
 
     def get_object(self):
         """
         Resolves the order by `reference` first, then by UUID `id`.
-        This guarantees backward-compatibility with legacy orders whose
-        `reference` field was still null at the time of creation.
         """
         lookup = self.kwargs.get("reference")
-        qs = Order.objects.filter(user=self.request.user).select_related('user').prefetch_related(
+        qs = Order.objects.select_related('user').prefetch_related(
             "items__product__product__category",
             "items__product__product__images",
             "items__product__product__variants",
@@ -102,31 +100,56 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
         if not order:
             from rest_framework.exceptions import NotFound
             raise NotFound(_("Commande introuvable."))
+            
+        # Permission check
+        if order.user:
+            user = self.request.user
+            if not user.is_authenticated:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(_("Vous devez être connecté pour voir cette commande."))
+            
+            is_owner = user == order.user
+            is_admin = user.is_staff or getattr(user, 'role', '') == 'admin'
+            
+            if not (is_owner or is_admin):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(_("Vous n'avez pas la permission de voir cette commande."))
+
         return order
 
 
 class OrderHistoryAPIView(generics.ListAPIView):
     serializer_class = OrderHistorySerializer
-    permission_classes = [IsAuthenticated, IsCustomer | IsPlatformAdmin]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         reference = self.kwargs["reference"]
         
-        # If user is admin/staff, they can view any order's history
-        if self.request.user.is_staff or getattr(self.request.user, 'role', '') == 'admin':
-            order = (
-                Order.objects.filter(reference=reference).first()
-                or get_object_or_404(Order, pk=reference)
-            )
-        else:
-            qs = Order.objects.filter(user=self.request.user)
-            order = (
-                qs.filter(reference=reference).first()
-                or qs.filter(pk=reference).first()
-            )
-            if not order:
-                from rest_framework.exceptions import NotFound
-                raise NotFound(_("Commande introuvable."))
+        order = Order.objects.filter(reference=reference).first()
+        if not order:
+            from django.core.exceptions import ValidationError
+            try:
+                order = Order.objects.filter(pk=reference).first()
+            except (ValueError, ValidationError):
+                pass
+                
+        if not order:
+            from rest_framework.exceptions import NotFound
+            raise NotFound(_("Commande introuvable."))
+
+        # Permission check
+        if order.user:
+            user = self.request.user
+            if not user.is_authenticated:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(_("Vous devez être connecté pour voir cette commande."))
+            
+            is_owner = user == order.user
+            is_admin = user.is_staff or getattr(user, 'role', '') == 'admin'
+            
+            if not (is_owner or is_admin):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(_("Vous n'avez pas la permission de voir cette commande."))
             
         return order.status_history.all().order_by("created_at")
 
