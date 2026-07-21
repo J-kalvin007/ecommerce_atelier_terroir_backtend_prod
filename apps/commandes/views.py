@@ -24,7 +24,7 @@ from apps.core.permissions import IsCustomer, IsPlatformAdmin
 
 
 # ==================================================
-# CLIENT VIEWS
+# CLIENTS VIEWS
 # ==================================================
 
 class CheckoutAPIView(generics.GenericAPIView):
