@@ -90,7 +90,14 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
             "items__product__product__variants",
         )
         # Try matching by reference first, then fall back to UUID pk
-        order = qs.filter(reference=lookup).first() or qs.filter(pk=lookup).first()
+        order = qs.filter(reference=lookup).first()
+        if not order:
+            from django.core.exceptions import ValidationError
+            try:
+                order = qs.filter(pk=lookup).first()
+            except (ValueError, ValidationError):
+                pass
+                
         if not order:
             from rest_framework.exceptions import NotFound
             raise NotFound(_("Commande introuvable."))
