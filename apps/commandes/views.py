@@ -76,14 +76,25 @@ class MyOrderListAPIView(generics.ListAPIView):
 class OrderDetailAPIView(generics.RetrieveAPIView):
     serializer_class = OrderDetailSerializer
     permission_classes = [IsAuthenticated, IsCustomer | IsPlatformAdmin]
-    lookup_field = "reference"
 
-    def get_queryset(self):
-        return Order.objects.filter(user=self.request.user).select_related('user').prefetch_related(
+    def get_object(self):
+        """
+        Resolves the order by `reference` first, then by UUID `id`.
+        This guarantees backward-compatibility with legacy orders whose
+        `reference` field was still null at the time of creation.
+        """
+        lookup = self.kwargs.get("reference")
+        qs = Order.objects.filter(user=self.request.user).select_related('user').prefetch_related(
             "items__product__product__category",
             "items__product__product__images",
             "items__product__product__variants",
         )
+        # Try matching by reference first, then fall back to UUID pk
+        order = qs.filter(reference=lookup).first() or qs.filter(pk=lookup).first()
+        if not order:
+            from rest_framework.exceptions import NotFound
+            raise NotFound(_("Commande introuvable."))
+        return order
 
 
 class OrderHistoryAPIView(generics.ListAPIView):
@@ -95,13 +106,19 @@ class OrderHistoryAPIView(generics.ListAPIView):
         
         # If user is admin/staff, they can view any order's history
         if self.request.user.is_staff or getattr(self.request.user, 'role', '') == 'admin':
-            order = get_object_or_404(Order, reference=reference)
-        else:
-            order = get_object_or_404(
-                Order,
-                reference=reference,
-                user=self.request.user,
+            order = (
+                Order.objects.filter(reference=reference).first()
+                or get_object_or_404(Order, pk=reference)
             )
+        else:
+            qs = Order.objects.filter(user=self.request.user)
+            order = (
+                qs.filter(reference=reference).first()
+                or qs.filter(pk=reference).first()
+            )
+            if not order:
+                from rest_framework.exceptions import NotFound
+                raise NotFound(_("Commande introuvable."))
             
         return order.status_history.all().order_by("created_at")
 
@@ -114,11 +131,12 @@ class OrderCancelView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsCustomer | IsPlatformAdmin]
 
     def post(self, request, reference):
-        order = get_object_or_404(
-            Order,
-            reference=reference,
-            user=request.user,
-        )
+        qs = Order.objects.filter(user=request.user)
+        # Resolve by reference first, then by UUID pk (backward compat)
+        order = qs.filter(reference=reference).first() or qs.filter(pk=reference).first()
+        if not order:
+            from rest_framework.exceptions import NotFound
+            raise NotFound(_("Commande introuvable."))
 
         allowed_cancel_statuses = [
             OrderStatus.DRAFT,
