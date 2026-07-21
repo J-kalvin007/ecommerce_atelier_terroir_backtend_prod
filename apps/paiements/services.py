@@ -13,6 +13,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from apps.commandes.models import Order, OrderStatus
+from apps.commandes.services import OrderService
 from .exceptions import (
     InsufficientBalanceError,
     WalletInactiveError,
@@ -308,9 +309,12 @@ class PaymentService:
                 payment.status = Payment.Status.SUCCESS
                 payment.reference_externe = reference
                 payment.save(update_fields=["status", "reference_externe"])
-                order.status = OrderStatus.PAID
-                order.paid_at = timezone.now()
-                order.save(update_fields=["status", "paid_at"])
+                OrderService.update_status(
+                    order=order,
+                    new_status=OrderStatus.PAID,
+                    changed_by=user,
+                    comment="Paiement validé par Wallet"
+                )
 
                 # --- Décrémentation des stocks ---
                 from apps.catalog.models import ProductVariant
@@ -436,9 +440,12 @@ class PaymentService:
             elif existing_payment.payment_type == Payment.PaymentType.DIRECT_PAYMENT:
                 # Mettre à jour la commande
                 if existing_payment.order:
-                    existing_payment.order.status = OrderStatus.PAID
-                    existing_payment.order.paid_at = timezone.now()
-                    existing_payment.order.save(update_fields=["status", "paid_at"])
+                    OrderService.update_status(
+                        order=existing_payment.order,
+                        new_status=OrderStatus.PAID,
+                        changed_by=None,
+                        comment="Paiement validé par PayDunya (Webhook)"
+                    )
 
             log_entry.status_traitement = "processed"
             log_entry.notes = "Traitement réussi."

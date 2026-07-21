@@ -18,6 +18,7 @@ def create_wallet_on_user_creation(sender, instance, created, **kwargs):
 
 
 from apps.commandes.models import OrderStatusHistory, OrderStatus
+from apps.commandes.services import OrderService
 from .services import PaymentService
 import logging
 
@@ -50,7 +51,10 @@ def update_order_status_on_payment_success(sender, instance, created, **kwargs):
     """
     if instance.status == Payment.Status.SUCCESS and instance.payment_type == Payment.PaymentType.DIRECT_PAYMENT:
         if instance.order and instance.order.status != OrderStatus.PAID:
-            instance.order.status = OrderStatus.PAID
-            instance.order.paid_at = timezone.now()
-            instance.order.save(update_fields=["status", "paid_at"])
+            OrderService.update_status(
+                order=instance.order,
+                new_status=OrderStatus.PAID,
+                changed_by=None,
+                comment=f"Paiement validé (ID: {instance.id})"
+            )
             logger.info(f"Signal déclenché : Commande {instance.order.reference} mise à jour en PAID via paiement {instance.id}.")

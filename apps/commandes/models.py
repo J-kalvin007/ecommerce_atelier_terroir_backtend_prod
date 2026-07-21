@@ -116,6 +116,19 @@ class Order(BaseModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="orders",
+        null=True,
+        blank=True,
+    )
+
+    nom_client = models.CharField(max_length=100, blank=True, null=True)
+    prenom_client = models.CharField(max_length=100, blank=True, null=True)
+    email_client = models.EmailField(blank=True, null=True)
+
+    numero_commande = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        null=True,
     )
 
     reference = models.CharField(
@@ -194,7 +207,28 @@ class Order(BaseModel):
         ]
 
     def __str__(self):
-        return str(self.reference) if self.reference else f"Commande #{self.pk} (sans référence)"
+        return str(self.numero_commande) if self.numero_commande else (str(self.reference) if self.reference else f"Commande #{self.pk} (sans référence)")
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new and not self.numero_commande:
+            import datetime
+            date_str = datetime.date.today().strftime('%Y%m%d')
+            initials = "CL"
+            
+            prenom = self.prenom_client or (self.user.first_name if self.user else "")
+            nom = self.nom_client or (self.user.last_name if self.user else "")
+            
+            if prenom and nom:
+                initials = f"{prenom[0].upper()}{nom[0].upper()}"
+            elif prenom:
+                initials = f"{prenom[0:2].upper()}"
+            elif nom:
+                initials = f"{nom[0:2].upper()}"
+            
+            self.numero_commande = f"{initials}-{date_str}-{self.pk:04d}"
+            super().save(update_fields=['numero_commande'])
 
 
 

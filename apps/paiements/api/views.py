@@ -14,7 +14,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.commandes.models import Order
+from apps.commandes.models import Order, OrderStatus
+from apps.commandes.services import OrderService
 from apps.paiements.models import Wallet, Payment, WalletTransaction
 
 # Create and configure logger
@@ -68,8 +69,12 @@ def paydunya_webhook(request):
             logger.info(f"Commande trouvée pour le token {token} : {order.reference}.")
             
             with transaction.atomic():
-                order.status = "paid"
-                order.save()
+                OrderService.update_status(
+                    order=order,
+                    new_status=OrderStatus.PAID,
+                    changed_by=None,
+                    comment="Paiement validé par PayDunya (Webhook View)"
+                )
                 logger.info(f"Statut de la commande {order.reference} mis à jour avec succès : PAID.")
 
                 # --- Décrémentation des stocks ---

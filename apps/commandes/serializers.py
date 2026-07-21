@@ -15,6 +15,9 @@ class CheckoutItemSerializer(serializers.Serializer):
 
 
 class CheckoutSerializer(serializers.Serializer):
+    nom_client = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    prenom_client = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    email_client = serializers.EmailField(required=False, allow_blank=True)
     address_livraison = serializers.CharField(max_length=255)
     phone_livraison = serializers.CharField(max_length=30)
     city = serializers.CharField(max_length=100)
@@ -63,8 +66,12 @@ class OrderListSerializer(serializers.ModelSerializer):
         model = Order
         fields = (
             "id",
+            "numero_commande",
             "reference",
             "user",
+            "nom_client",
+            "prenom_client",
+            "email_client",
             "status",
             "items_total",
             "frais_livraison",
@@ -86,8 +93,12 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         model = Order
         fields = (
             "id",
+            "numero_commande",
             "reference",
             "user",
+            "nom_client",
+            "prenom_client",
+            "email_client",
             "status",
             "address_livraison",
             "phone_livraison",

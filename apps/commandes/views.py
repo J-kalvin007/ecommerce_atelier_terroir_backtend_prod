@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter, OpenApiTypes
 
@@ -28,15 +28,20 @@ from apps.core.permissions import IsCustomer, IsPlatformAdmin
 # ==================================================
 
 class CheckoutAPIView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated, IsCustomer | IsPlatformAdmin]
+    permission_classes = [AllowAny]
     serializer_class = CheckoutSerializer
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        user = request.user if request.user.is_authenticated else None
+
         order = OrderService.create_order(
-            user=request.user,
+            user=user,
+            nom_client=serializer.validated_data.get("nom_client", ""),
+            prenom_client=serializer.validated_data.get("prenom_client", ""),
+            email_client=serializer.validated_data.get("email_client", ""),
             items=serializer.validated_data["items"],
             address_livraison=serializer.validated_data["address_livraison"],
             phone_livraison=serializer.validated_data["phone_livraison"],

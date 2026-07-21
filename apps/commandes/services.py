@@ -2,8 +2,9 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 
-from apps.commandes.models import Order, OrderItem, OrderStatusHistory
+from apps.commandes.models import Order, OrderItem, OrderStatusHistory, OrderStatus
 
 
 class OrderService:
@@ -41,6 +42,9 @@ class OrderService:
         phone_livraison,
         city,
         country,
+        nom_client="",
+        prenom_client="",
+        email_client="",
         notes="",
         frais_livraison=Decimal("0.00"),
         discount_amount=Decimal("0.00"),
@@ -107,6 +111,9 @@ class OrderService:
 
         order = Order.objects.create(
             user=user,
+            nom_client=nom_client,
+            prenom_client=prenom_client,
+            email_client=email_client,
             address_livraison=address_livraison,
             phone_livraison=phone_livraison,
             city=city,
@@ -154,7 +161,7 @@ class OrderService:
             old_status="",
             new_status=order.status,
             comment="Commande créée.",
-            changed_by=user,
+            changed_by=user if user else None,
         )
 
         return order
@@ -175,9 +182,14 @@ class OrderService:
         old_status = order.status
 
         order.status = new_status
+        
+        update_fields = ["status"]
+        if new_status == OrderStatus.PAID and old_status != OrderStatus.PAID:
+            order.paid_at = timezone.now()
+            update_fields.append("paid_at")
 
         order.save(
-            update_fields=["status"]
+            update_fields=update_fields
         )
 
         OrderStatusHistory.objects.create(
@@ -207,9 +219,15 @@ class FactureEmailService:
         from django.utils.html import strip_tags
 
         if not order.user or not order.user.email:
-            return False
+            if not getattr(order, 'email_client', None):
+                return False
+            recipient_email = order.email_client
+            client_first_name = order.prenom_client or ""
+        else:
+            recipient_email = order.user.email
+            client_first_name = order.user.first_name
 
-        subject = f"Facture de votre commande {order.reference}"
+        subject = f"Facture de votre commande {order.numero_commande or order.reference}"
         
         # Contexte pour le template HTML
         context = {
@@ -223,8 +241,8 @@ class FactureEmailService:
         <html>
             <body style="font-family: Arial, sans-serif; color: #333;">
                 <h2 style="color: #1f4d3f;">Merci pour votre commande !</h2>
-                <p>Bonjour {order.user.first_name},</p>
-                <p>Votre commande <strong>{order.reference}</strong> a été payée avec succès.</p>
+                <p>Bonjour {client_first_name},</p>
+                <p>Votre commande <strong>{order.numero_commande or order.reference}</strong> a été payée avec succès.</p>
                 <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
                     <thead>
                         <tr style="background-color: #f8faf8; border-bottom: 2px solid #1f4d3f;">
@@ -258,7 +276,7 @@ class FactureEmailService:
             subject=subject,
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[order.user.email],
+            to=[recipient_email],
         )
         msg.attach_alternative(html_content, "text/html")
         
