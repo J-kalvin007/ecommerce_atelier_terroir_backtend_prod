@@ -142,8 +142,8 @@ class WalletService:
             WalletInactiveError: si le wallet n'est pas actif.
         """
         amount = amount.quantize(Decimal("0.01"))
-        if amount <= 0:
-            raise ValueError("Le montant doit être strictement positif.")
+        if amount < 0:
+            raise ValueError("Le montant doit être positif ou nul.")
 
         locked_wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
 

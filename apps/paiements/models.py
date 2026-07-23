@@ -111,7 +111,7 @@ class WalletTransaction(BaseModel):
     amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        validators=[MinValueValidator(Decimal("0.01"))],
+        validators=[MinValueValidator(Decimal("0.00"))],
     )
 
     reference = models.CharField(
@@ -231,7 +231,7 @@ class Payment(BaseModel):
     amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        validators=[MinValueValidator(Decimal("0.01"))],
+        validators=[MinValueValidator(Decimal("0.00"))],
     )
 
     status = models.CharField(
