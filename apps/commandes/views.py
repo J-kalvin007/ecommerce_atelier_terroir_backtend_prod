@@ -31,6 +31,12 @@ class CheckoutAPIView(generics.GenericAPIView):
     permission_classes = [AllowAny]
     serializer_class = CheckoutSerializer
 
+    @extend_schema(
+        summary="Valider une commande",
+        description="Crée une nouvelle commande à partir des informations fournies.",
+        request=CheckoutSerializer,
+        responses={201: OrderDetailSerializer}
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -66,6 +72,14 @@ class MyOrderListAPIView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
     ordering = ["-created_at"]
 
+    @extend_schema(
+        summary="Lister mes commandes",
+        description="Renvoie la liste des commandes de l'utilisateur connecté.",
+        responses={200: OrderListSerializer}
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).select_related('user').prefetch_related(
             "items__product__product__category",
@@ -77,6 +91,14 @@ class MyOrderListAPIView(generics.ListAPIView):
 class OrderDetailAPIView(generics.RetrieveAPIView):
     serializer_class = OrderDetailSerializer
     permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Détails d'une commande",
+        description="Renvoie les détails d'une commande (via sa référence ou son ID) appartenant à l'utilisateur connecté.",
+        responses={200: OrderDetailSerializer}
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     def get_object(self):
         """
@@ -122,6 +144,14 @@ class OrderHistoryAPIView(generics.ListAPIView):
     serializer_class = OrderHistorySerializer
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Historique d'une commande",
+        description="Renvoie l'historique des changements de statut d'une commande via sa référence ou son ID.",
+        responses={200: OrderHistorySerializer(many=True)}
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
         reference = self.kwargs["reference"]
         
@@ -161,6 +191,14 @@ class OrderCancelView(generics.GenericAPIView):
     """
     permission_classes = [IsAuthenticated, IsCustomer | IsPlatformAdmin]
 
+    @extend_schema(
+        summary="Annuler une commande",
+        description="Permet au client d'annuler une commande si elle n'est pas encore expédiée ou livrée (via sa référence ou son ID).",
+        responses={
+            200: OpenApiResponse(description="Commande annulée avec succès."),
+            400: OpenApiResponse(description="Cette commande ne peut plus être annulée.")
+        }
+    )
     def post(self, request, reference):
         qs = Order.objects.filter(user=request.user)
         # Resolve by reference first, then by UUID pk (backward compat)
@@ -210,27 +248,81 @@ class AdminOrderListAPIView(generics.ListAPIView):
     filterset_class = OrderFilter
     filter_backends = [DjangoFilterBackend]
 
+    @extend_schema(
+        summary="Lister toutes les commandes (Admin)",
+        description="Renvoie la liste de toutes les commandes pour l'administration.",
+        responses={200: OrderListSerializer}
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
 
 class AdminOrderDetailAPIView(generics.RetrieveAPIView):
     serializer_class = OrderDetailSerializer
     permission_classes = [IsAuthenticated, IsPlatformAdmin]
-    queryset = Order.objects.all().select_related('user').prefetch_related(
-        "items__product__product__category",
-        "items__product__product__images",
-        "items__product__product__variants",
+
+    @extend_schema(
+        summary="Détails d'une commande (Admin)",
+        description="Récupère les détails d'une commande via sa référence unique ou son ID (UUID).",
+        responses={200: OrderDetailSerializer}
     )
-    lookup_field = "reference"
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Order.objects.all().select_related('user').prefetch_related(
+            "items__product__product__category",
+            "items__product__product__images",
+            "items__product__product__variants",
+        )
+
+    def get_object(self):
+        """
+        Resolves the order by `reference` first, then by UUID `id`.
+        """
+        lookup = self.kwargs.get("reference")
+        qs = self.get_queryset()
+        
+        order = qs.filter(reference=lookup).first()
+        if not order:
+            from django.core.exceptions import ValidationError
+            try:
+                order = qs.filter(pk=lookup).first()
+            except (ValueError, ValidationError):
+                pass
+                
+        if not order:
+            from rest_framework.exceptions import NotFound
+            raise NotFound(_("Commande introuvable."))
+            
+        return order
 
 
 class AdminOrderStatusAPIView(generics.GenericAPIView):
     serializer_class = AdminOrderStatusSerializer
     permission_classes = [IsAuthenticated, IsPlatformAdmin]
 
+    @extend_schema(
+        summary="Mettre à jour le statut (Admin)",
+        description="Met à jour le statut d'une commande via sa référence unique ou son ID (UUID).",
+        request=AdminOrderStatusSerializer,
+        responses={200: OrderDetailSerializer}
+    )
     def patch(self, request, reference):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        order = get_object_or_404(Order, reference=reference)
+        order = Order.objects.filter(reference=reference).first()
+        if not order:
+            from django.core.exceptions import ValidationError
+            try:
+                order = Order.objects.filter(pk=reference).first()
+            except (ValueError, ValidationError):
+                pass
+
+        if not order:
+            from rest_framework.exceptions import NotFound
+            raise NotFound(_("Commande introuvable."))
 
         OrderService.update_status(
             order=order,

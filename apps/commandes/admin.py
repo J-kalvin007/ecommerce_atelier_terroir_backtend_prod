@@ -201,7 +201,7 @@ class OrderAdmin(admin.ModelAdmin):
     )
     list_display_links = ('order_number_display',)
     list_filter = ('status', 'country', 'city', 'created_at')
-    search_fields = ('reference', 'user__email', 'phone_livraison')
+    search_fields = ('id', 'numero_commande', 'reference', 'user__email', 'phone_livraison')
     autocomplete_fields = ('user',)
     readonly_fields = (
         'id', 'reference', 'created_at', 'updated_at', 
