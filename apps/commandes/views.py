@@ -129,13 +129,6 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
             if not user.is_authenticated:
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied(_("Vous devez être connecté pour voir cette commande."))
-            
-            is_owner = user == order.user
-            is_admin = user.is_staff or getattr(user, 'role', '') == 'admin'
-            
-            if not (is_owner or is_admin):
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied(_("Vous n'avez pas la permission de voir cette commande."))
 
         return order
 
@@ -173,13 +166,6 @@ class OrderHistoryAPIView(generics.ListAPIView):
             if not user.is_authenticated:
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied(_("Vous devez être connecté pour voir cette commande."))
-            
-            is_owner = user == order.user
-            is_admin = user.is_staff or getattr(user, 'role', '') == 'admin'
-            
-            if not (is_owner or is_admin):
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied(_("Vous n'avez pas la permission de voir cette commande."))
             
         return order.status_history.all().order_by("created_at")
 
