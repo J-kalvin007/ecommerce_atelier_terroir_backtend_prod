@@ -178,18 +178,6 @@ class LoyaltyProfile(BaseModel):
         if new_tier and new_tier != old_tier:
             self.tier = new_tier
             self.save(update_fields=["tier", "updated_at"])
-
-            # Audit trail du changement de palier
-            TierChangeLog.objects.create(
-                user=self.user,
-                from_tier=old_tier.name if old_tier else "Aucun",
-                to_tier=new_tier.name,
-                reason=(
-                    f"Recalcul automatique : "
-                    f"{self.total_points_gagne} pts cumulés, "
-                    f"{self.total_solde} FCFA dépensés."
-                ),
-            )
             return True
         return False
 

@@ -267,7 +267,7 @@ class OrderItem(BaseModel):
 
     product = models.ForeignKey(
         ProductVariant,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
 
     product_name = models.CharField(max_length=255)
