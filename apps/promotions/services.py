@@ -176,7 +176,7 @@ class PromoService:
         ).exclude(
             quota_stock_limit__isnull=False,
             product_sold_count__gte=F("quota_stock_limit"),
-        ).select_related("product", "variant")
+        ).select_related("product", "variant").prefetch_related("product__images")
 
     @staticmethod
     def get_active_banners(banner_type: str = None):

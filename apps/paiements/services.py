@@ -516,7 +516,7 @@ class PaymentService:
                     wallet=wallet,
                     amount=payment.amount,
                     reference=f"REF-{payment.pk}",
-                    metadata={"original_payment_id": payment.id, "reason": description},
+                    metadata={"original_payment_id": str(payment.id), "reason": description},
                     transaction_type=WalletTransaction.Type.REFUND
                 )
                 refunded_payments.append(payment)

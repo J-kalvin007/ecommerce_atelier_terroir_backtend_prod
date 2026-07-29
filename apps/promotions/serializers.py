@@ -91,7 +91,11 @@ class SoldesSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_product_image(self, obj):
-        primary = obj.product.images.filter(is_primary=True).first()
+        # Utilise le cache prefetch_related("product__images") pour éviter le N+1
+        primary = next(
+            (img for img in obj.product.images.all() if img.is_primary),
+            None
+        )
         if primary and primary.image:
             request = self.context.get("request")
             if request:

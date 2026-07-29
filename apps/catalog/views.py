@@ -167,6 +167,7 @@ class ProductAdminViewSet(ModelViewSet):
             "images",
             "variants",
             "related_products",
+            "category__children",  # Évite le N+1 de CategorySerializer.get_children()
         )
     )
 
