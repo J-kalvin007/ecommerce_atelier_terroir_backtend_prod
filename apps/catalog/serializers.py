@@ -39,6 +39,18 @@ class CategorySerializer(serializers.ModelSerializer):
             context=self.context
         ).data
 
+class CategorySimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "description",
+            "image",
+            "parent",
+        )
+
 
 # =====================================================
 # PRODUCT IMAGE
@@ -204,7 +216,7 @@ class ProductDetailSerializer(ProductListSerializer):
         read_only=True,
     )
 
-    category = CategorySerializer(
+    category = CategorySimpleSerializer(
         read_only=True,
     )
 

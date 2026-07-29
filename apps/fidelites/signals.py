@@ -49,6 +49,10 @@ def handle_order_status_change(sender, instance, **kwargs):
     if getattr(instance, "_loyalty_processing", False):
         return
 
+    # Les utilisateurs anonymes (guest) ne bénéficient pas du programme de fidélité
+    if not instance.user:
+        return
+
     try:
         instance._loyalty_processing = True
 
