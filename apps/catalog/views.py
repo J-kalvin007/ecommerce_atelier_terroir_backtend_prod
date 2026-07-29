@@ -148,6 +148,16 @@ class CategoryAdminViewSet(ModelViewSet):
         .prefetch_related("children")
     )
 
+    def destroy(self, request, *args, **kwargs):
+        from django.db.models import ProtectedError
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"detail": "Impossible de supprimer cette catégorie car elle contient des produits ou des sous-catégories."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 # =====================================================
 # ADMIN PRODUCT
