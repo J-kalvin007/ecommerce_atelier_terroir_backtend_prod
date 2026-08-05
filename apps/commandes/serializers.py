@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.commandes.models import Order, OrderItem, OrderStatus, OrderStatusHistory, Cart, CartItem
+from apps.commandes.models import Order, OrderItem, OrderStatus, OrderStatusHistory, Cart, CartItem, CartPackItem, OrderPack
 from ecommerce_backend.users.api.serializers import UserSerializer
 from apps.catalog.serializers import ProductVariantSerializer
 
@@ -11,6 +11,11 @@ from apps.catalog.serializers import ProductVariantSerializer
 
 class CheckoutItemSerializer(serializers.Serializer):
     product_id = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class CheckoutPackSerializer(serializers.Serializer):
+    pack_id = serializers.UUIDField()
     quantity = serializers.IntegerField(min_value=1)
 
 
@@ -26,12 +31,13 @@ class CheckoutSerializer(serializers.Serializer):
     frais_livraison = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     discount_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     is_for_delivery = serializers.BooleanField(default=True)
-    items = CheckoutItemSerializer(many=True)
+    items = CheckoutItemSerializer(many=True, required=False)
+    packs = CheckoutPackSerializer(many=True, required=False)
 
-    def validate_items(self, value):
-        if not value:
-            raise serializers.ValidationError("La commande doit contenir au moins un produit.")
-        return value
+    def validate(self, attrs):
+        if not attrs.get("items") and not attrs.get("packs"):
+            raise serializers.ValidationError("La commande doit contenir au moins un produit ou un pack.")
+        return attrs
 
 
 # =====================================================
@@ -52,6 +58,24 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "quantity",
             "unit_price",
             "subtotal",
+            "order_pack",
+        )
+
+
+# =====================================================
+# ORDER PACK
+# =====================================================
+
+class OrderPackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderPack
+        fields = (
+            "id",
+            "pack",
+            "pack_name",
+            "quantity",
+            "unit_price",
+            "subtotal",
         )
 
 
@@ -62,6 +86,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderListSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
+    packs = OrderPackSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
@@ -80,6 +105,7 @@ class OrderListSerializer(serializers.ModelSerializer):
             "total_final",
             "created_at",
             "items",
+            "packs",
         )
 
 
@@ -89,6 +115,7 @@ class OrderListSerializer(serializers.ModelSerializer):
 
 class OrderDetailSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    packs = OrderPackSerializer(many=True, read_only=True)
     user = UserSerializer(read_only=True)
 
     class Meta:
@@ -117,6 +144,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "items",
+            "packs",
         )
 
 
@@ -192,12 +220,44 @@ class AddCartItemSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
 
 
+class CartPackItemSerializer(serializers.ModelSerializer):
+    pack_name = serializers.CharField(source="pack.name", read_only=True)
+    pack_price = serializers.DecimalField(source="pack.price", max_digits=12, decimal_places=2, read_only=True)
+    pack_image = serializers.SerializerMethodField()
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = CartPackItem
+        fields = (
+            "id",
+            "pack",
+            "pack_name",
+            "pack_price",
+            "pack_image",
+            "quantity",
+            "subtotal"
+        )
+        
+    def get_pack_image(self, obj):
+        if obj.pack.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.pack.image.url)
+            return obj.pack.image.url
+        return None
+
+class AddCartPackSerializer(serializers.Serializer):
+    pack_id = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
 # =====================================================
 # CART
 # =====================================================
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
+    pack_items = CartPackItemSerializer(many=True, read_only=True)
     total = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
 
@@ -207,6 +267,7 @@ class CartSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "items",
+            "pack_items",
             "total",
             "item_count",
             "created_at",
@@ -215,7 +276,11 @@ class CartSerializer(serializers.ModelSerializer):
         read_only_fields = ("user", "created_at", "updated_at")
 
     def get_total(self, obj):
-        return sum(item.subtotal for item in obj.items.all())
+        products_total = sum(item.subtotal for item in obj.items.all())
+        packs_total = sum(item.subtotal for item in obj.pack_items.all())
+        return products_total + packs_total
 
     def get_item_count(self, obj):
-        return sum(item.quantity for item in obj.items.all())
+        products_count = sum(item.quantity for item in obj.items.all())
+        packs_count = sum(item.quantity for item in obj.pack_items.all())
+        return products_count + packs_count

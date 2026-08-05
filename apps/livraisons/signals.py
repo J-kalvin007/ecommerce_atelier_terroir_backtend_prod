@@ -1,21 +1,47 @@
 import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
-from .models import Delivery, DeliveryStatus
-from apps.commandes.models import OrderStatus
+from apps.commandes.models import Order, OrderStatus
+from .models import Delivery
+from .services import DeliveryService, LivraisonService
 
 logger = logging.getLogger(__name__)
 
+@receiver(post_save, sender=Order)
+def ensure_delivery_for_order(sender, instance, created, **kwargs):
+    """
+    Couche filet (descendante) : s'assure qu'une livraison existe pour toute
+    commande devant être livrée et ayant atteint un statut actif.
+    """
+    if not instance.is_for_delivery:
+        return
+
+    active_statuses = [
+        OrderStatus.PAID,
+        OrderStatus.CONFIRMED,
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPED,
+    ]
+
+    if instance.status in active_statuses:
+        # get_or_create s'assure qu'on ne crée pas de doublon
+        delivery, delivery_created = Delivery.objects.get_or_create(
+            order=instance,
+            defaults={
+                "delivery_address": instance.address_livraison,
+            }
+        )
+        if delivery_created:
+            logger.info(f"Livraison {delivery.id} auto-créée via signal pour la commande {instance.reference}.")
+
+
 @receiver(post_save, sender=Delivery)
-def update_order_status_on_delivery(sender, instance, created, **kwargs):
+def sync_order_status_from_delivery(sender, instance, created, **kwargs):
     """
-    Met à jour automatiquement le statut de la commande associée 
-    lorsque la livraison est marquée comme LIVRÉE (DELIVERED).
+    Couche filet (montante) : si une livraison est modifiée hors du DeliveryService
+    (ex: via l'Admin Django), on s'assure que le statut de la commande est synchronisé.
+    La vraie logique de mise à jour est centralisée dans le service.
     """
-    if instance.status == DeliveryStatus.DELIVERED:
-        order = instance.order
-        if order and order.status != OrderStatus.DELIVERED:
-            order.status = OrderStatus.DELIVERED
-            order.save(update_fields=["status", "updated_at"])
-            logger.info(f"Signal déclenché : Commande {order.reference} mise à jour en DELIVERED via Livraison {instance.id}.")
+    if not created:
+        # Appel du service métier au lieu de modifier brutalement order.status
+        DeliveryService._sync_order_status(instance, user=None)

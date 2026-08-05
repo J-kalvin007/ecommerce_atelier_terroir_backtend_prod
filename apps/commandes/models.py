@@ -76,8 +76,40 @@ class CartItem(BaseModel):
         return self.product.price * self.quantity
 
 
+class CartPackItem(BaseModel):
+    """Ligne de panier : un pack promotionnel et sa quantité."""
 
+    cart = models.ForeignKey(
+        Cart,
+        on_delete=models.CASCADE,
+        related_name="pack_items",
+    )
 
+    pack = models.ForeignKey(
+        "promotions.Pack",
+        on_delete=models.CASCADE,
+        related_name="cart_items",
+    )
+
+    quantity = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        db_table = "commandes_cart_pack_items"
+        verbose_name = "Pack de panier"
+        verbose_name_plural = "Packs de panier"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cart", "pack"],
+                name="unique_cartpackitem_cart_pack",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.pack.name} x {self.quantity}"
+
+    @property
+    def subtotal(self):
+        return self.pack.price * self.quantity
 
 
 # =====================================================
@@ -242,6 +274,53 @@ class Order(BaseModel):
 
 
 # =====================================================
+# ORDER PACK
+# =====================================================
+
+class OrderPack(BaseModel):
+    """
+    Pack commandé (snapshot immuable).
+    """
+
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="packs",
+    )
+
+    pack = models.ForeignKey(
+        "promotions.Pack",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+
+    pack_name = models.CharField(max_length=255)
+    quantity = models.PositiveIntegerField()
+
+    unit_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    subtotal = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    class Meta:
+        db_table = "commandes_order_packs"
+        verbose_name = "Pack commandé"
+        verbose_name_plural = "Packs commandés"
+        indexes = [
+            models.Index(fields=["order"]),
+        ]
+
+    def __str__(self):
+        return f"{self.pack_name} x {self.quantity}"
+
+
+# =====================================================
 # ORDER ITEM
 # =====================================================
 
@@ -284,6 +363,15 @@ class OrderItem(BaseModel):
     subtotal = models.DecimalField(
         max_digits=12,
         decimal_places=2,
+    )
+
+    order_pack = models.ForeignKey(
+        OrderPack,
+        on_delete=models.CASCADE,
+        related_name="items",
+        null=True,
+        blank=True,
+        help_text="Si cet article fait partie d'un pack commandé."
     )
 
     class Meta:

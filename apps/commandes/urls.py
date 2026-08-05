@@ -12,6 +12,8 @@ from apps.commandes.views import (
     CartAPIView,
     CartItemAPIView,
     CartItemDetailAPIView,
+    CartPackItemAPIView,
+    CartPackItemDetailAPIView,
 )
 
 app_name = "commandes"
@@ -35,6 +37,16 @@ urlpatterns = [
         "cart/items/<uuid:product_id>/",
         CartItemDetailAPIView.as_view(),
         name="cart-item-detail",
+    ),
+    path(
+        "cart/packs/",
+        CartPackItemAPIView.as_view(),
+        name="cart-packs",
+    ),
+    path(
+        "cart/packs/<uuid:pack_id>/",
+        CartPackItemDetailAPIView.as_view(),
+        name="cart-pack-detail",
     ),
 
     # ==================================================

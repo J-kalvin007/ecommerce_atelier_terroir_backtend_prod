@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db.models import F
 from django.utils import timezone
 
-from .models import PromoCode, Soldes, Banner
+from .models import PromoCode, Soldes, Banner, Pack, PackItem
 
 
 @admin.register(PromoCode)
@@ -65,3 +65,18 @@ class BannerAdmin(admin.ModelAdmin):
     list_filter = ("banner_type", "is_active")
     search_fields = ("title", "subtitle")
     list_editable = ("position", "is_active")
+
+
+class PackItemInline(admin.TabularInline):
+    model = PackItem
+    extra = 1
+    autocomplete_fields = ["product_variant"]
+
+
+@admin.register(Pack)
+class PackAdmin(admin.ModelAdmin):
+    list_display = ("name", "price", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name", "description")
+    readonly_fields = ("created_at", "updated_at")
+    inlines = [PackItemInline]

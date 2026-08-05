@@ -7,7 +7,7 @@ et les serializers d'administration (CRUD complet).
 from decimal import Decimal
 from rest_framework import serializers
 
-from .models import PromoCode, Soldes, Banner
+from .models import PromoCode, Soldes, Banner, Pack, PackItem
 
 
 # ─── Public ────────────────────────────────────────────────────────────────
@@ -129,6 +129,56 @@ class BannerSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.image.url)
             return obj.image.url
         return None
+
+
+class PackItemSerializer(serializers.ModelSerializer):
+    """Article inclus dans un pack."""
+    # Note: On importe localement pour éviter les imports circulaires si nécessaire
+    
+    class Meta:
+        model = PackItem
+        fields = ("id", "product_variant", "quantity")
+
+    def to_representation(self, instance):
+        from apps.catalog.serializers import ProductVariantSerializer
+        representation = super().to_representation(instance)
+        representation["product_variant"] = ProductVariantSerializer(
+            instance.product_variant, context=self.context
+        ).data
+        return representation
+
+
+class PackSerializer(serializers.ModelSerializer):
+    """Affichage public d'un pack."""
+    items = PackItemSerializer(many=True, read_only=True)
+    image_url = serializers.SerializerMethodField()
+    available_stock = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Pack
+        fields = (
+            "id",
+            "name",
+            "description",
+            "price",
+            "image_url",
+            "is_active",
+            "items",
+            "available_stock"
+        )
+        read_only_fields = fields
+
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
+    def get_available_stock(self, obj):
+        from .services import PackService
+        return PackService.calculate_pack_stock(obj)
 
 
 # ─── Admin ────────────────────────────────────────────────────────────────

@@ -36,3 +36,14 @@ class PromoTierRestrictionError(PromoCodeError):
 class FlashSaleError(Exception):
     """Exception de base pour les erreurs de flash sale."""
     pass
+
+
+class PackError(Exception):
+    """Exception de base pour les erreurs liées aux packs."""
+    default_message = "Erreur liée au pack promotionnel."
+    default_code = "pack_error"
+
+    def __init__(self, message=None, code=None):
+        self.message = message or self.default_message
+        self.code = code or self.default_code
+        super().__init__(self.message)

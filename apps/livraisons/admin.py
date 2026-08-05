@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import FraisLivraison, Delivery, DeliveryStatus
@@ -134,3 +134,87 @@ class DeliveryAdmin(admin.ModelAdmin):
         )
     dates_info.short_description = _("Délais")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LIVREUR ADMIN
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .models import Livreur
+
+@admin.register(Livreur)
+class LivreurAdmin(admin.ModelAdmin):
+    list_display = (
+        "nom_complet_badge", 
+        "telephone_info", 
+        "vehicule_badge", 
+        "zone_livraison_info",
+        "status_badge"
+    )
+    list_filter = ("is_active", "type_vehicule", "created_at")
+    search_fields = ("nom", "prenom", "telephone", "email", "zone_livraison")
+    readonly_fields = ("id", "created_at", "updated_at")
+    list_select_related = ("user",)
+    
+    actions = ['desactiver_livreurs']
+
+    fieldsets = (
+        (_("Identité & Contact"), {
+            "fields": (("prenom", "nom"), "telephone", "email")
+        }),
+        (_("Opérationnel"), {
+            "fields": ("type_vehicule", "zone_livraison", "user")
+        }),
+        (_("Administration"), {
+            "fields": ("is_active", "notes")
+        }),
+        (_("Métadonnées"), {
+            "fields": ("id", "created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+
+    def nom_complet_badge(self, obj):
+        return format_html(
+            '<strong style="color: #111827; font-size: 13px;">{}</strong>',
+            obj.nom_complet
+        )
+    nom_complet_badge.short_description = _("Livreur")
+    nom_complet_badge.admin_order_field = 'nom'
+
+    def telephone_info(self, obj):
+        return format_html(
+            '<span style="font-family: monospace; font-size: 12px; color: #4b5563;">{}</span>',
+            obj.telephone
+        )
+    telephone_info.short_description = _("Téléphone")
+
+    def vehicule_badge(self, obj):
+        return format_html(
+            '<span style="background-color: #f3f4f6; color: #374151; padding: 3px 8px; border-radius: 6px; font-size: 11px; border: 1px solid #d1d5db; text-transform: uppercase;">{}</span>',
+            obj.get_type_vehicule_display()
+        )
+    vehicule_badge.short_description = _("Véhicule")
+    vehicule_badge.admin_order_field = 'type_vehicule'
+
+    def zone_livraison_info(self, obj):
+        return obj.zone_livraison or "-"
+    zone_livraison_info.short_description = _("Zone")
+
+    def status_badge(self, obj):
+        if obj.is_active:
+            return format_html(
+                '<span style="background-color: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid #34d399; text-transform: uppercase;">Actif</span>'
+            )
+        return format_html(
+            '<span style="background-color: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid #f87171; text-transform: uppercase;">Inactif</span>'
+        )
+    status_badge.short_description = _("Statut")
+    status_badge.admin_order_field = 'is_active'
+
+    @admin.action(description=_("Désactiver logiquement les livreurs sélectionnés"))
+    def desactiver_livreurs(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(
+            request, 
+            _("%(count)d livreurs ont été désactivés logiquement.") % {"count": updated}
+        )

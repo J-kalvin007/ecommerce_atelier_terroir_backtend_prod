@@ -31,6 +31,7 @@ class FraisLivraison(BaseModel):
 
 class DeliveryStatus(models.TextChoices):
     PENDING = "pending", "En attente"
+    ASSIGNED = "assigned", "Assignée"
     IN_TRANSIT = "in_transit", "En transit"
     DELIVERED = "delivered", "Livrée"
     CANCELLED = "cancelled", "Annulée"
@@ -66,6 +67,16 @@ class Delivery(BaseModel):
         help_text="L'utilisateur (livreur) en charge de cette livraison."
     )
 
+    livreur = models.ForeignKey(
+        "Livreur",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deliveries",
+        verbose_name="Livreur assigné",
+        help_text="Le profil livreur assigné à cette livraison."
+    )
+
     estimated_delivery_date = models.DateTimeField(null=True, blank=True)
     
     actual_delivery_date = models.DateTimeField(null=True, blank=True)
@@ -83,3 +94,167 @@ class Delivery(BaseModel):
 
     def __str__(self):
         return f"Livraison {self.id} pour Cmd {self.order.reference}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LIVREUR
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TypeVehicule(models.TextChoices):
+    """Types de véhicules disponibles pour les livreurs."""
+    MOTO = "moto", "Moto"
+    TRICYCLE = "tricycle", "Tricycle"
+    VOITURE = "voiture", "Voiture"
+    CAMIONNETTE = "camionnette", "Camionnette"
+    VELO = "velo", "Vélo"
+    A_PIED = "a_pied", "À pied"
+
+
+class Livreur(BaseModel):
+    """
+    Profil d'un livreur partenaire de la plateforme.
+
+    Distinct du champ Delivery.delivery_person (FK vers AUTH_USER_MODEL) qui
+    est conservé pour compatibilité ascendante. Ce modèle est le point d'entrée
+    canonique pour toute nouvelle logique de gestion des livreurs.
+
+    La désactivation logique (is_active=False, hérité de BaseModel) est préférée
+    à la suppression physique pour conserver l'historique des livraisons passées.
+    """
+
+    nom = models.CharField(
+        max_length=100,
+        verbose_name="Nom",
+        help_text="Nom de famille du livreur.",
+    )
+
+    prenom = models.CharField(
+        max_length=100,
+        verbose_name="Prénom",
+        help_text="Prénom du livreur.",
+    )
+
+    telephone = models.CharField(
+        max_length=30,
+        verbose_name="Téléphone",
+        help_text="Numéro de téléphone principal du livreur.",
+        db_index=True,
+    )
+
+    email = models.EmailField(
+        blank=True,
+        null=True,
+        verbose_name="Email",
+        help_text="Adresse email du livreur (optionnel).",
+    )
+
+    type_vehicule = models.CharField(
+        max_length=20,
+        choices=TypeVehicule.choices,
+        verbose_name="Type de véhicule",
+        help_text="Type de véhicule utilisé pour les livraisons.",
+    )
+
+    zone_livraison = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Zone de livraison",
+        help_text="Zone géographique couverte par le livreur (texte libre).",
+    )
+
+    # Rattachement optionnel à un compte utilisateur de la plateforme.
+    # related_name="profil_livreur" est distinct de "deliveries_handled"
+    # qui appartient à Delivery.delivery_person (FK vers AUTH_USER_MODEL).
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="profil_livreur",
+        verbose_name="Compte utilisateur",
+        help_text="Compte plateforme associé à ce livreur (optionnel).",
+    )
+
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Notes internes",
+        help_text="Informations internes sur le livreur (non visibles du client).",
+    )
+
+    class Meta:
+        db_table = "livraisons_livreurs"
+        verbose_name = "Livreur"
+        verbose_name_plural = "Livreurs"
+        ordering = ["nom", "prenom"]
+        indexes = [
+            models.Index(fields=["telephone"], name="livraisons_livreur_tel_idx"),
+            models.Index(fields=["is_active"], name="livraisons_livreur_active_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.prenom} {self.nom}"
+
+    @property
+    def nom_complet(self) -> str:
+        """Retourne le nom complet du livreur (prénom + nom)."""
+        return f"{self.prenom} {self.nom}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DELIVERY STATUS HISTORY
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DeliveryStatusHistory(BaseModel):
+    """
+    Historique des changements de statut d'une livraison.
+
+    Permet de tracer "qui a fait quoi et quand" sur une livraison, 
+    essentiel pour la résolution de litiges.
+    """
+    delivery = models.ForeignKey(
+        Delivery,
+        on_delete=models.CASCADE,
+        related_name="status_history",
+        verbose_name="Livraison"
+    )
+
+    old_status = models.CharField(
+        max_length=20,
+        choices=DeliveryStatus.choices,
+        blank=True,
+        null=True,
+        verbose_name="Ancien statut"
+    )
+
+    new_status = models.CharField(
+        max_length=20,
+        choices=DeliveryStatus.choices,
+        verbose_name="Nouveau statut"
+    )
+
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Modifié par"
+    )
+
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Notes / Motif"
+    )
+
+    class Meta:
+        db_table = "livraisons_delivery_history"
+        verbose_name = "Historique de livraison"
+        verbose_name_plural = "Historiques de livraison"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["delivery", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.delivery.id} : {self.old_status} -> {self.new_status}"
+

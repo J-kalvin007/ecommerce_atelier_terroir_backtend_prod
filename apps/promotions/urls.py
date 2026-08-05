@@ -12,7 +12,12 @@ from .views import (
     AdminPromoCodeViewSet,
     AdminFlashSaleViewSet,
     AdminBannerViewSet,
+    ActivePacksViewSet,
 )
+
+# Router public
+public_router = DefaultRouter()
+public_router.register(r"packs", ActivePacksViewSet, basename="active-packs")
 
 # Router admin
 admin_router = DefaultRouter()
@@ -32,6 +37,9 @@ urlpatterns = [
 
     path("recommendations-actives/", ActiveBannersView.as_view(), name="active-banners"),
     
+    # Public ViewSets
+    path("", include(public_router.urls)),
+
     # Admin
     path("admin/", include(admin_router.urls)),
 ]

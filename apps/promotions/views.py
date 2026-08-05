@@ -18,7 +18,7 @@ from apps.core.permissions import IsPlatformAdmin
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter, inline_serializer
 from rest_framework import serializers
 from .exceptions import PromoCodeError
-from .models import PromoCode, Soldes, Banner
+from .models import PromoCode, Soldes, Banner, Pack
 from .serializers import (
     PromoCodeListSerializer,
     ValidateCodeSerializer,
@@ -28,6 +28,7 @@ from .serializers import (
     AdminPromoCodeSerializer,
     AdminSoldesSerializer,
     AdminBannerSerializer,
+    PackSerializer,
 )
 from .services import PromoService
 
@@ -241,6 +242,35 @@ class ActiveBannersView(APIView):
             banners, many=True, context={"request": request}
         )
         return Response(serializer.data)
+
+
+class ActivePacksViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    GET /api/v1/promotions/packs/
+    Liste des packs promotionnels actifs (public).
+    """
+    permission_classes = [AllowAny]
+    serializer_class = PackSerializer
+    
+    @extend_schema(
+        summary="Liste des packs actifs",
+        description="Renvoie la liste des packs promotionnels actuellement actifs."
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Détails d'un pack",
+        description="Renvoie les détails d'un pack promotionnel, y compris ses composants."
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Pack.objects.filter(is_active=True).prefetch_related(
+            "items__product_variant__product__category",
+            "items__product_variant__product__images"
+        ).order_by("-created_at")
 
 
 # ─── Admin ────────────────────────────────────────────────────────────────

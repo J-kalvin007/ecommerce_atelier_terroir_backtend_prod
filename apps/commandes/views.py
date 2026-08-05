@@ -6,8 +6,9 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter, OpenApiTypes
 
 from apps.commandes.filters import OrderFilter
-from apps.commandes.models import Order, OrderStatus, Cart, CartItem
+from apps.commandes.models import Order, OrderStatus, Cart, CartItem, CartPackItem
 from apps.catalog.models import ProductVariant
+from apps.promotions.models import Pack
 from django.utils.translation import gettext as _
 from apps.commandes.serializers import (
     AdminOrderStatusSerializer,
@@ -18,6 +19,8 @@ from apps.commandes.serializers import (
     CartSerializer,
     CartItemSerializer,
     AddCartItemSerializer,
+    CartPackItemSerializer,
+    AddCartPackSerializer,
 )
 from apps.commandes.services import OrderService
 from apps.core.permissions import IsCustomer, IsPlatformAdmin
@@ -48,7 +51,8 @@ class CheckoutAPIView(generics.GenericAPIView):
             nom_client=serializer.validated_data.get("nom_client", ""),
             prenom_client=serializer.validated_data.get("prenom_client", ""),
             email_client=serializer.validated_data.get("email_client", ""),
-            items=serializer.validated_data["items"],
+            items=serializer.validated_data.get("items", []),
+            packs=serializer.validated_data.get("packs", []),
             address_livraison=serializer.validated_data["address_livraison"],
             phone_livraison=serializer.validated_data["phone_livraison"],
             city=serializer.validated_data["city"],
@@ -348,6 +352,7 @@ class CartAPIView(generics.RetrieveAPIView, generics.DestroyAPIView):
     def delete(self, request, *args, **kwargs):
         cart = self.get_object()
         cart.items.all().delete()
+        cart.pack_items.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -425,6 +430,88 @@ class CartItemDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         summary="Supprimer un élément",
         description="Supprime complètement un élément du panier.",
         responses={204: OpenApiResponse(description="Élément supprimé avec succès.")}
+    )
+    def delete(self, request, *args, **kwargs):
+        cart_item = self.get_object()
+        cart_item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CartPackItemAPIView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AddCartPackSerializer
+
+    @extend_schema(
+        summary="Ajouter un pack au panier",
+        description="Ajoute un pack promotionnel au panier de l'utilisateur. Si le pack y est déjà, la quantité est mise à jour.",
+        request=AddCartPackSerializer,
+        responses={201: CartPackItemSerializer}
+    )
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        pack_id = serializer.validated_data["pack_id"]
+        quantity = serializer.validated_data["quantity"]
+        
+        pack = get_object_or_404(Pack, id=pack_id, is_active=True)
+        
+        cart_item, created = CartPackItem.objects.get_or_create(
+            cart=cart, 
+            pack=pack,
+            defaults={"quantity": quantity}
+        )
+        
+        if not created:
+            cart_item.quantity += quantity
+            cart_item.save()
+            
+        return Response(CartPackItemSerializer(cart_item, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+class CartPackItemDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AddCartPackSerializer
+
+    def get_queryset(self):
+        cart, _ = Cart.objects.get_or_create(user=self.request.user)
+        return CartPackItem.objects.filter(cart=cart)
+
+    def get_object(self):
+        cart_item = get_object_or_404(self.get_queryset(), pack_id=self.kwargs["pack_id"])
+        return cart_item
+
+    @extend_schema(
+        summary="Récupérer un pack du panier",
+        description="Renvoie les détails d'un pack spécifique du panier via son pack_id.",
+        responses={200: CartPackItemSerializer}
+    )
+    def get(self, request, *args, **kwargs):
+        cart_item = self.get_object()
+        return Response(CartPackItemSerializer(cart_item, context={'request': request}).data)
+
+    @extend_schema(
+        summary="Mettre à jour la quantité d'un pack",
+        description="Met à jour la quantité d'un pack dans le panier.",
+        request=AddCartPackSerializer,
+        responses={200: CartPackItemSerializer}
+    )
+    def patch(self, request, *args, **kwargs):
+        cart_item = self.get_object()
+        serializer = self.get_serializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
+        if "quantity" in serializer.validated_data:
+            cart_item.quantity = serializer.validated_data["quantity"]
+            cart_item.save()
+            
+        return Response(CartPackItemSerializer(cart_item, context={'request': request}).data)
+
+    @extend_schema(
+        summary="Supprimer un pack",
+        description="Supprime complètement un pack du panier.",
+        responses={204: OpenApiResponse(description="Pack supprimé avec succès.")}
     )
     def delete(self, request, *args, **kwargs):
         cart_item = self.get_object()

@@ -431,3 +431,63 @@ class Banner(BaseModel):
         if self.ends_at and now > self.ends_at:
             return False
         return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PACK PRODUITS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Pack(BaseModel):
+    """
+    Pack promotionnel regroupant plusieurs produits à un prix fixe avantageux.
+    """
+    name = models.CharField(max_length=100, verbose_name="Nom du pack")
+    description = models.TextField(blank=True, verbose_name="Description")
+    price = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        verbose_name="Prix du pack",
+        help_text="Prix fixe global du pack (souvent inférieur à la somme des produits)."
+    )
+    image = models.ImageField(upload_to="packs/", blank=True, null=True, verbose_name="Image")
+    
+    class Meta:
+        db_table = "promotions_packs"
+        verbose_name = "Pack produit"
+        verbose_name_plural = "Packs produits"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name
+
+class PackItem(BaseModel):
+    """
+    Article inclus dans un pack.
+    Lie un pack à une variante de produit spécifique et une quantité.
+    """
+    pack = models.ForeignKey(
+        Pack,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+    product_variant = models.ForeignKey(
+        "catalog.ProductVariant",
+        on_delete=models.CASCADE,
+        related_name="pack_inclusions",
+        verbose_name="Variante de produit"
+    )
+    quantity = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name="Quantité"
+    )
+
+    class Meta:
+        db_table = "promotions_pack_items"
+        verbose_name = "Article de pack"
+        verbose_name_plural = "Articles de pack"
+        unique_together = [("pack", "product_variant")]
+
+    def __str__(self):
+        return f"{self.quantity}x {self.product_variant.name} (Pack: {self.pack.name})"

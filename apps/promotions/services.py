@@ -16,8 +16,9 @@ from .exceptions import (
     InvalidPromoCodeError,
     PromoExpiredError,
     PromoTierRestrictionError,
+    PackError,
 )
-from .models import PromoCode, Soldes, Banner
+from .models import PromoCode, Soldes, Banner, Pack
 
 logger = logging.getLogger(__name__)
 
@@ -202,3 +203,75 @@ class PromoService:
             qs = qs.filter(banner_type=banner_type)
 
         return qs.order_by("banner_type", "position", "-created_at")
+
+
+class PackService:
+    """Service gérant la logique métier des packs promotionnels."""
+    
+    @staticmethod
+    def calculate_pack_stock(pack: Pack) -> int:
+        """
+        Calcule le stock virtuel du pack en fonction du stock de ses composants.
+        Le stock du pack est limité par le composant le plus contraignant.
+        """
+        items = pack.items.select_related('product_variant').all()
+        if not items:
+            return 0
+        
+        min_stock = float('inf')
+        for item in items:
+            variant_stock = item.product_variant.stock
+            possible_packs = variant_stock // item.quantity
+            if possible_packs < min_stock:
+                min_stock = possible_packs
+                
+        return int(min_stock) if min_stock != float('inf') else 0
+
+    @staticmethod
+    def check_pack_availability(pack: Pack, requested_quantity: int = 1) -> bool:
+        """
+        Vérifie si le pack est disponible pour la quantité demandée.
+        Lève PackError si insuffisant.
+        """
+        if not pack.is_active:
+            raise PackError(f"Le pack '{pack.name}' n'est pas actif.")
+            
+        available_stock = PackService.calculate_pack_stock(pack)
+        if available_stock < requested_quantity:
+            raise PackError(
+                f"Stock insuffisant pour le pack '{pack.name}'. "
+                f"Demandé: {requested_quantity}, Disponible: {available_stock}"
+            )
+        return True
+
+    @staticmethod
+    @transaction.atomic
+    def decrement_pack_stock(pack: Pack, requested_quantity: int = 1):
+        """
+        Décrémente le stock de toutes les variantes incluses dans le pack.
+        Lève PackError en cas de stock insuffisant sur l'un des composants.
+        """
+        items = pack.items.select_related('product_variant').all()
+        
+        for item in items:
+            variant = item.product_variant
+            required_variant_qty = item.quantity * requested_quantity
+            
+            # Optionnel: on pourrait re-vérifier avec select_for_update() ici
+            # Mais la méthode check_pack_availability() fait un premier filtre,
+            # et si c'est appelé depuis OrderService.create_order, on peut avoir 
+            # déjà géré le locking.
+            
+            if variant.stock < required_variant_qty:
+                raise PackError(
+                    f"Stock insuffisant sur le composant '{variant.name}' "
+                    f"pour composer {requested_quantity} pack(s) '{pack.name}'."
+                )
+                
+            variant.stock = F('stock') - required_variant_qty
+            variant.save(update_fields=['stock'])
+            
+            # MAJ stock produit principal par cohérence avec l'architecture existante
+            if variant.product:
+                variant.product.stock = F('stock') - required_variant_qty
+                variant.product.save(update_fields=['stock'])

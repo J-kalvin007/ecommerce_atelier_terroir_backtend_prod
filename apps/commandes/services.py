@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.commandes.models import Order, OrderItem, OrderStatusHistory, OrderStatus
+from apps.commandes.models import Order, OrderItem, OrderPack, OrderStatusHistory, OrderStatus
 
 
 class OrderService:
@@ -37,7 +37,8 @@ class OrderService:
     def create_order(
         *,
         user,
-        items,
+        items=None,
+        packs=None,
         address_livraison,
         phone_livraison,
         city,
@@ -51,17 +52,18 @@ class OrderService:
         discount_amount=Decimal("0.00"),
     ):
         """
-        Création complète d'une commande.
-
-        Chaque item.product_id doit être l'UUID d'une ProductVariant.
-        Si le frontend envoie un product_id de Product (sans variante sélectionnée),
-        on tente de résoudre la variante par défaut de ce produit automatiquement.
+        Création complète d'une commande incluant des produits simples et/ou des packs.
         """
         from apps.catalog.models import ProductVariant
+        from apps.promotions.models import Pack
+        from apps.promotions.services import PackService
 
-        if not items:
+        items = items or []
+        packs = packs or []
+
+        if not items and not packs:
             raise ValidationError(
-                "La commande doit contenir au moins un produit."
+                "La commande doit contenir au moins un produit ou un pack."
             )
 
         variants_cache = {}
@@ -101,11 +103,34 @@ class OrderService:
 
             variants_cache[pid] = variant
 
-        # Calcul des totaux sur la base des prix des variantes
+        packs_cache = {}
+        for p in packs:
+            pid = str(p["pack_id"])
+            pack = Pack.objects.filter(id=pid, is_active=True).first()
+            if not pack:
+                raise ValidationError(f"Pack introuvable: {pid}")
+                
+            qty = p["quantity"]
+            if qty <= 0:
+                raise ValidationError("La quantité de pack doit être supérieure à zéro.")
+                
+            from apps.promotions.exceptions import PackError
+            try:
+                PackService.check_pack_availability(pack, qty)
+            except PackError as e:
+                raise ValidationError(str(e))
+                
+            packs_cache[pid] = pack
+
+        # Calcul des totaux sur la base des prix des variantes et des packs
         items_total = Decimal("0.00")
         for item in items:
             v = variants_cache[str(item["product_id"])]
             items_total += v.price * item["quantity"]
+            
+        for p in packs:
+            pack = packs_cache[str(p["pack_id"])]
+            items_total += pack.price * p["quantity"]
 
         tax_amount = Decimal("0.00")
         total_final = items_total + tax_amount + Decimal(str(frais_livraison)) - Decimal(str(discount_amount))
@@ -157,6 +182,44 @@ class OrderService:
                 produit_principal.save(update_fields=["stock"])
 
         OrderItem.objects.bulk_create(order_items)
+
+        # Création des packs commandés
+        order_pack_items_to_create = []
+        for p in packs:
+            pack = packs_cache[str(p["pack_id"])]
+            quantity = p["quantity"]
+            subtotal = pack.price * quantity
+
+            order_pack = OrderPack.objects.create(
+                order=order,
+                pack=pack,
+                pack_name=pack.name,
+                quantity=quantity,
+                unit_price=pack.price,
+                subtotal=subtotal
+            )
+
+            for pack_item in pack.items.select_related('product_variant').all():
+                variant = pack_item.product_variant
+                item_qty = pack_item.quantity * quantity
+
+                order_pack_items_to_create.append(
+                    OrderItem(
+                        order=order,
+                        product=variant,
+                        product_name=f"{variant.product.name} — {variant.name} (Pack {pack.name})",
+                        product_sku=variant.sku,
+                        quantity=item_qty,
+                        unit_price=Decimal("0.00"),
+                        subtotal=Decimal("0.00"),
+                        order_pack=order_pack
+                    )
+                )
+
+            PackService.decrement_pack_stock(pack, quantity)
+            
+        if order_pack_items_to_create:
+            OrderItem.objects.bulk_create(order_pack_items_to_create)
 
         OrderStatusHistory.objects.create(
             order=order,
