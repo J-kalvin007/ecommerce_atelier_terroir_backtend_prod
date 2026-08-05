@@ -441,8 +441,8 @@ class Pack(BaseModel):
     """
     Pack promotionnel regroupant plusieurs produits à un prix fixe avantageux.
     """
-    name = models.CharField(max_length=100, verbose_name="Nom du pack")
-    description = models.TextField(blank=True, verbose_name="Description")
+    name = models.CharField(blank=True, null=True, max_length=100, verbose_name="Nom du pack")
+    description = models.TextField(blank=True, null=True, verbose_name="Description")
     price = models.DecimalField(
         max_digits=12, 
         decimal_places=2,
@@ -461,6 +461,8 @@ class Pack(BaseModel):
     def __str__(self):
         return self.name
 
+
+
 class PackItem(BaseModel):
     """
     Article inclus dans un pack.
@@ -478,6 +480,8 @@ class PackItem(BaseModel):
         verbose_name="Variante de produit"
     )
     quantity = models.PositiveIntegerField(
+        blank=True,
+        null=True,
         default=1,
         validators=[MinValueValidator(1)],
         verbose_name="Quantité"

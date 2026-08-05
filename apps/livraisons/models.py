@@ -123,18 +123,21 @@ class Livreur(BaseModel):
     """
 
     nom = models.CharField(
+        blank=True, null=True,
         max_length=100,
         verbose_name="Nom",
         help_text="Nom de famille du livreur.",
     )
 
     prenom = models.CharField(
+        blank=True, null=True,
         max_length=100,
         verbose_name="Prénom",
         help_text="Prénom du livreur.",
     )
 
     telephone = models.CharField(
+        blank=True, null=True,
         max_length=30,
         verbose_name="Téléphone",
         help_text="Numéro de téléphone principal du livreur.",
@@ -149,6 +152,7 @@ class Livreur(BaseModel):
     )
 
     type_vehicule = models.CharField(
+        blank=True, null=True,
         max_length=20,
         choices=TypeVehicule.choices,
         verbose_name="Type de véhicule",
@@ -156,6 +160,7 @@ class Livreur(BaseModel):
     )
 
     zone_livraison = models.CharField(
+        null=True,
         max_length=255,
         blank=True,
         verbose_name="Zone de livraison",
@@ -176,6 +181,7 @@ class Livreur(BaseModel):
     )
 
     notes = models.TextField(
+        null=True,
         blank=True,
         verbose_name="Notes internes",
         help_text="Informations internes sur le livreur (non visibles du client).",

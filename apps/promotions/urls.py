@@ -13,6 +13,7 @@ from .views import (
     AdminFlashSaleViewSet,
     AdminBannerViewSet,
     ActivePacksViewSet,
+    AdminPackViewSet,
 )
 
 # Router public
@@ -24,6 +25,7 @@ admin_router = DefaultRouter()
 admin_router.register(r"codes-promo", AdminPromoCodeViewSet, basename="admin-promo-codes")
 admin_router.register(r"ventes-solde", AdminFlashSaleViewSet, basename="admin-ventes-solde")
 admin_router.register(r"recommendations", AdminBannerViewSet, basename="admin-recommendations")
+admin_router.register(r"packs", AdminPackViewSet, basename="admin-packs")
 
 urlpatterns = [
     # Public

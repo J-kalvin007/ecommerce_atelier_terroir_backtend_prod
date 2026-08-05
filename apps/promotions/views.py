@@ -29,6 +29,7 @@ from .serializers import (
     AdminSoldesSerializer,
     AdminBannerSerializer,
     PackSerializer,
+    AdminPackSerializer,
 )
 from .services import PromoService
 
@@ -343,4 +344,11 @@ class AdminBannerViewSet(viewsets.ModelViewSet):
     """CRUD admin pour les bannières."""
     queryset = Banner.objects.all().order_by("banner_type", "position")
     serializer_class = AdminBannerSerializer
+    permission_classes = [IsPlatformAdmin]
+
+
+class AdminPackViewSet(viewsets.ModelViewSet):
+    """CRUD admin pour les packs promotionnels."""
+    queryset = Pack.objects.all().order_by("-created_at")
+    serializer_class = AdminPackSerializer
     permission_classes = [IsPlatformAdmin]

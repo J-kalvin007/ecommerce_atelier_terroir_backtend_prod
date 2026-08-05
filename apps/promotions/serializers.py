@@ -8,6 +8,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from .models import PromoCode, Soldes, Banner, Pack, PackItem
+from apps.catalog.serializers import ProductVariantSerializer
 
 
 # ─── Public ────────────────────────────────────────────────────────────────
@@ -133,19 +134,11 @@ class BannerSerializer(serializers.ModelSerializer):
 
 class PackItemSerializer(serializers.ModelSerializer):
     """Article inclus dans un pack."""
-    # Note: On importe localement pour éviter les imports circulaires si nécessaire
+    product_variant = ProductVariantSerializer(read_only=True)
     
     class Meta:
         model = PackItem
         fields = ("id", "product_variant", "quantity")
-
-    def to_representation(self, instance):
-        from apps.catalog.serializers import ProductVariantSerializer
-        representation = super().to_representation(instance)
-        representation["product_variant"] = ProductVariantSerializer(
-            instance.product_variant, context=self.context
-        ).data
-        return representation
 
 
 class PackSerializer(serializers.ModelSerializer):
@@ -238,5 +231,23 @@ class AdminBannerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Banner
+        fields = "__all__"
+        read_only_fields = ("id", "created_at", "updated_at")
+
+
+class AdminPackItemSerializer(serializers.ModelSerializer):
+    """Articles de pack pour l'administration."""
+    class Meta:
+        model = PackItem
+        fields = "__all__"
+        read_only_fields = ("id", "created_at", "updated_at")
+
+
+class AdminPackSerializer(serializers.ModelSerializer):
+    """CRUD admin des packs."""
+    items = AdminPackItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Pack
         fields = "__all__"
         read_only_fields = ("id", "created_at", "updated_at")
