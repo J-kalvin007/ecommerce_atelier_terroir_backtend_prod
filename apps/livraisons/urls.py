@@ -6,6 +6,6 @@ app_name = "livraisons"
 router = DefaultRouter()
 router.register(r"frais", FraisLivraisonViewSet, basename="frais")
 router.register(r"suivi", DeliveryViewSet, basename="suivi")
-router.register(r"livreurs", LivreurViewSet, basename="livreurs")
+router.register(r"admin/livreurs", LivreurViewSet, basename="livreurs")
 
 urlpatterns = router.urls

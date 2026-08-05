@@ -191,6 +191,76 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         serializer = MyDeliverySerializer(deliveries, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary="Créer les livraisons manquantes (Admin)",
+        description=(
+            "Crée automatiquement les livraisons pour toutes les commandes payées "
+            "(status='paid', is_for_delivery=True) qui n'ont pas encore de livraison. "
+            "Accepte un paramètre optionnel `order_id` (UUID) pour cibler une commande précise. "
+            "Réservé aux administrateurs de la plateforme."
+        ),
+        request=None,
+        responses={200: {"type": "object", "properties": {
+            "created": {"type": "integer"},
+            "errors": {"type": "integer"},
+            "details": {"type": "array", "items": {"type": "string"}},
+        }}},
+    )
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="admin/create-missing-deliveries",
+        permission_classes=[IsPlatformAdmin],
+    )
+    def create_missing_deliveries(self, request):
+        """
+        Crée manuellement les livraisons manquantes pour les commandes payées.
+        """
+        from apps.commandes.models import Order, OrderStatus
+        from .models import DeliveryStatus
+        from django.db import transaction as db_transaction
+
+        order_id = request.data.get("order_id")
+
+        qs = Order.objects.filter(
+            status=OrderStatus.PAID,
+            is_for_delivery=True,
+        ).exclude(delivery__isnull=False).select_related("user")
+
+        if order_id:
+            qs = qs.filter(pk=order_id)
+
+        created_count = 0
+        error_count = 0
+        details = []
+
+        for order in qs:
+            try:
+                with db_transaction.atomic():
+                    delivery, created = Delivery.objects.get_or_create(
+                        order=order,
+                        defaults={
+                            "status": DeliveryStatus.PENDING,
+                            "delivery_address": order.address_livraison or "",
+                            "notes": order.notes or "",
+                            "created_by": request.user,
+                        },
+                    )
+                if created:
+                    created_count += 1
+                    details.append(f"✅ Livraison créée — Commande {order.numero_commande or str(order.pk)}")
+                else:
+                    details.append(f"⚠️  Déjà existante — Commande {order.numero_commande or str(order.pk)}")
+            except Exception as exc:
+                error_count += 1
+                details.append(f"❌ Erreur — Commande {order.numero_commande or str(order.pk)} : {exc}")
+
+        return Response({
+            "created": created_count,
+            "errors": error_count,
+            "details": details,
+        }, status=status.HTTP_200_OK)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LIVREUR VIEWSET
