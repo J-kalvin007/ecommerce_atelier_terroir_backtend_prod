@@ -8,7 +8,7 @@ from .models import FraisLivraison, Delivery, Livreur
 from .serializers import (
     FraisLivraisonSerializer, FraisLivraisonPublicSerializer, 
     DeliverySerializer, LivreurSerializer, DeliveryStatusHistorySerializer,
-    ConfirmerReceptionSerializer
+    ConfirmerReceptionSerializer, MyDeliverySerializer
 )
 from .filters import DeliveryFilter, LivreurFilter
 from .services import DeliveryService
@@ -57,6 +57,9 @@ class DeliveryViewSet(viewsets.ModelViewSet):
             # Tout utilisateur authentifié peut potentiellement voir ses propres livraisons
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
     def get_queryset(self):
         user = self.request.user
@@ -172,6 +175,21 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(
+        summary="Mes livraisons",
+        description="Retourne les livraisons créées par l'utilisateur connecté, avec les données enrichies du livreur.",
+        responses={200: MyDeliverySerializer(many=True)}
+    )
+    @action(detail=False, methods=["get"], url_path="my-livraisons", permission_classes=[permissions.IsAuthenticated])
+    def my_livraisons(self, request):
+        deliveries = Delivery.objects.filter(created_by=request.user).select_related("order", "delivery_person", "livreur")
+        deliveries = self.filter_queryset(deliveries)
+        page = self.paginate_queryset(deliveries)
+        if page is not None:
+            serializer = MyDeliverySerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = MyDeliverySerializer(deliveries, many=True)
+        return Response(serializer.data)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

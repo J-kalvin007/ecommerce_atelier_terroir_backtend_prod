@@ -9,7 +9,7 @@ class DeliveryFilter(django_filters.FilterSet):
 
     class Meta:
         model = Delivery
-        fields = ["status", "order_reference", "delivery_person"]
+        fields = ["status", "order_reference", "delivery_person", "livreur", "created_by"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

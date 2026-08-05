@@ -47,7 +47,8 @@ def trigger_delivery_creation_on_paid(sender, instance, created, **kwargs):
                     defaults={
                         'status': DeliveryStatus.PENDING,
                         'delivery_address': order.address_livraison,
-                        'notes': order.notes
+                        'notes': order.notes,
+                        'created_by': instance.changed_by
                     }
                 )
                 

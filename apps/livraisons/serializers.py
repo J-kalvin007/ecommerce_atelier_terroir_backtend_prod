@@ -78,11 +78,12 @@ class DeliverySerializer(serializers.ModelSerializer):
             "estimated_delivery_date",
             "actual_delivery_date",
             "notes",
+            "created_by",
             "created_at",
             "updated_at",
             "is_active"
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "livreur_details", "history"]
+        read_only_fields = ["id", "created_by", "created_at", "updated_at", "livreur_details", "history"]
 
     def get_items_count(self, obj):
         return sum(item.quantity for item in obj.order.items.all())
@@ -102,7 +103,6 @@ class DeliverySerializer(serializers.ModelSerializer):
         if obj.livreur:
             return LivreurPublicSerializer(obj.livreur).data
         return None
-
 
 class DeliveryPublicSerializer(serializers.ModelSerializer):
     """
@@ -202,3 +202,14 @@ class LivreurPublicSerializer(serializers.ModelSerializer):
             "nom_complet",
             "type_vehicule",
         ]
+
+
+class MyDeliverySerializer(DeliverySerializer):
+    """
+    Serializer pour l'endpoint my-livraisons, avec les données enrichies du livreur
+    directement dans le champ 'livreur'.
+    """
+    livreur = LivreurSerializer(read_only=True)
+
+    class Meta(DeliverySerializer.Meta):
+        pass

@@ -83,6 +83,15 @@ class Delivery(BaseModel):
 
     notes = models.TextField(blank=True)
 
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_deliveries",
+        help_text="L'utilisateur qui a créé cette livraison."
+    )
+
     class Meta:
         db_table = "livraisons_delivery"
         verbose_name = "Livraison"
