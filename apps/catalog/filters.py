@@ -40,6 +40,23 @@ class ProductFilter(FilterSet):
         field_name="is_top",
     )
 
+    min_stock = NumberFilter(
+        field_name="stock",
+        lookup_expr="gte",
+        help_text="Stock supérieur ou égal à",
+    )
+
+    max_stock = NumberFilter(
+        field_name="stock",
+        lookup_expr="lte",
+        help_text="Stock inférieur ou égal à",
+    )
+
+    stock = NumberFilter(
+        field_name="stock",
+        help_text="Stock exact",
+    )
+
     class Meta:
         model = Product
 

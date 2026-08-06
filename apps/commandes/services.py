@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -98,7 +98,7 @@ class OrderService:
 
             if variant.stock < quantity:
                 raise ValidationError(
-                    f"Stock insuffisant pour {variant.product.name} — {variant.name}"
+                    f"La quantité demandée pour '{variant.product.name} — {variant.name}' dépasse notre stock disponible (Stock: {variant.stock})."
                 )
 
             variants_cache[pid] = variant
@@ -118,7 +118,10 @@ class OrderService:
             try:
                 PackService.check_pack_availability(pack, qty)
             except PackError as e:
-                raise ValidationError(str(e))
+                # Customiser le message pour qu'il soit plus user-friendly
+                raise ValidationError(
+                    f"Le pack '{pack.name}' n'est pas disponible en quantité suffisante (Stock disponible: {PackService.calculate_pack_stock(pack)})."
+                )
                 
             packs_cache[pid] = pack
 
