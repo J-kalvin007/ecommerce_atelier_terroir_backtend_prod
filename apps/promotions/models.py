@@ -14,6 +14,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import F
 from django.utils import timezone
+from django.utils.text import slugify
 
 from apps.core.models import BaseModel
 
@@ -442,6 +443,15 @@ class Pack(BaseModel):
     Pack promotionnel regroupant plusieurs produits à un prix fixe avantageux.
     """
     name = models.CharField(blank=True, null=True, max_length=100, verbose_name="Nom du pack")
+    slug = models.SlugField(
+        max_length=120,
+        unique=True,
+        blank=True,
+        null=True,
+        db_index=True,
+        verbose_name="Slug",
+        help_text="Identifiant URL du pack. Auto-généré depuis le nom si laissé vide.",
+    )
     description = models.TextField(blank=True, null=True, verbose_name="Description")
     price = models.DecimalField(
         max_digits=12, 
@@ -459,7 +469,26 @@ class Pack(BaseModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return self.name
+        return self.name or str(self.id)
+
+    def save(self, *args, **kwargs):
+        """Auto-génère un slug unique depuis le nom si non fourni."""
+        if not self.slug and self.name:
+            base_slug = slugify(self.name)
+            slug = base_slug
+            counter = 1
+            # Garantit l'unicité en ajoutant un suffixe numérique si nécessaire
+            qs = Pack.objects.filter(slug=slug)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            while qs.exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+                qs = Pack.objects.filter(slug=slug)
+                if self.pk:
+                    qs = qs.exclude(pk=self.pk)
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 

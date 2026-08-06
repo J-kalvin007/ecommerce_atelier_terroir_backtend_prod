@@ -252,6 +252,7 @@ class ActivePacksViewSet(viewsets.ReadOnlyModelViewSet):
     """
     permission_classes = [AllowAny]
     serializer_class = PackSerializer
+    lookup_field = "slug"
     
     @extend_schema(
         summary="Liste des packs actifs",
@@ -352,3 +353,4 @@ class AdminPackViewSet(viewsets.ModelViewSet):
     queryset = Pack.objects.all().order_by("-created_at")
     serializer_class = AdminPackSerializer
     permission_classes = [IsPlatformAdmin]
+    lookup_field = "slug"

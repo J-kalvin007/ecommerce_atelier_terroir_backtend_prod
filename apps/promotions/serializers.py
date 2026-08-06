@@ -152,6 +152,7 @@ class PackSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
+            "slug",
             "description",
             "price",
             "image_url",
@@ -250,4 +251,4 @@ class AdminPackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pack
         fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
+        read_only_fields = ("id", "created_at", "updated_at", "slug")
