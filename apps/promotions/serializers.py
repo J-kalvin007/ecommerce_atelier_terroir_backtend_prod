@@ -9,6 +9,7 @@ from rest_framework import serializers
 
 from .models import PromoCode, Soldes, Banner, Pack, PackItem
 from apps.catalog.serializers import ProductVariantSerializer
+from apps.catalog.models import ProductVariant
 
 
 # ─── Public ────────────────────────────────────────────────────────────────
@@ -132,9 +133,43 @@ class BannerSerializer(serializers.ModelSerializer):
         return None
 
 
+class PackItemVariantSerializer(serializers.ModelSerializer):
+    """Variante sérialisée pour l'affichage dans les items de packs (inclut l'image du produit parent)."""
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_slug = serializers.CharField(source="product.slug", read_only=True)
+    product_primary_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductVariant
+        fields = (
+            "id",
+            "name",
+            "price",
+            "stock",
+            "weight_grams",
+            "is_active",
+            "product_name",
+            "product_slug",
+            "product_primary_image",
+        )
+
+    def get_product_primary_image(self, obj):
+        """Retourne l'URL absolue de l'image principale du produit parent."""
+        primary = next(
+            (img for img in obj.product.images.all() if img.is_primary),
+            None,
+        ) or next(iter(obj.product.images.all()), None)
+        if primary and primary.image:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(primary.image.url)
+            return primary.image.url
+        return None
+
+
 class PackItemSerializer(serializers.ModelSerializer):
     """Article inclus dans un pack."""
-    product_variant = ProductVariantSerializer(read_only=True)
+    product_variant = PackItemVariantSerializer(read_only=True)
     
     class Meta:
         model = PackItem
