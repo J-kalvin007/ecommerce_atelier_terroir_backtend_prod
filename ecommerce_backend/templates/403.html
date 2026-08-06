@@ -1,13 +1,64 @@
 {% extends "base.html" %}
 
+{% load i18n %}
+
+{% comment %}
+Page 403 — accès refusé.
+
+La logique `« if exception »` d'origine est conservée telle quelle.
+
+L'action proposée dépend de l'état de session : une personne non
+authentifiée est orientée vers la connexion, ce qui résout la cause
+la plus fréquente ; une personne déjà connectée n'obtiendra rien de
+plus en se reconnectant, on la ramène donc à l'accueil.
+{% endcomment %}
+
 {% block title %}Forbidden (403){% endblock title %}
+
 {% block content %}
-  <h1>Forbidden (403)</h1>
-  <p>
-    {% if exception %}
-      {{ exception }}
+
+<section class="adt-state" role="alert" aria-labelledby="adt-403-title">
+
+  <p class="adt-eyebrow adt-rise" style="--i: 0">{% translate "Accès refusé" %}</p>
+
+  <p class="adt-state__code adt-rise" style="--i: 1" aria-hidden="true">403</p>
+
+  <h1 id="adt-403-title" class="adt-state__title adt-rise" style="--i: 2">
+    {% translate "Cette page ne vous est pas ouverte." %}
+  </h1>
+
+  <p class="adt-lede adt-rise" style="--i: 3">
+    {% if request.user.is_authenticated %}
+    {% translate "Votre compte n'a pas les droits requis pour cette ressource. Si vous pensez qu'il s'agit d'une erreur,
+    contactez un administrateur." %}
     {% else %}
-      You're not allowed to access this page.
+    {% translate "Cette ressource demande une session ouverte. Connectez-vous, puis réessayez." %}
     {% endif %}
   </p>
+
+  <p class="adt-state__detail adt-rise" style="--i: 4">
+    {% if exception %}
+    {{ exception }}
+    {% else %}
+    You're not allowed to access this page.
+    {% endif %}
+  </p>
+
+  <div class="adt-state__actions adt-rise" style="--i: 5">
+    {% if request.user.is_authenticated %}
+    <a class="btn btn-primary" href="{% url 'home' %}">
+      {% translate "Retour à l'accueil" %}
+    </a>
+    {% else %}
+    <a class="btn btn-primary" href="{% url 'account_login' %}">
+      {% translate "Se connecter" %}
+    </a>
+    <a class="btn adt-btn-ghost" href="{% url 'home' %}">
+      {% translate "Retour à l'accueil" %}
+    </a>
+    {% endif %}
+  </div>
+
+</section>
+
 {% endblock content %}

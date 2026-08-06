@@ -1,13 +1,56 @@
 {% extends "base.html" %}
 
+{% load i18n %}
+
+{% comment %}
+Page 404.
+
+La logique conditionnelle d'origine est conservée au caractère près :
+`exception` porte le message levé par la vue lorsqu'il existe, sinon
+un texte de repli est affiché.
+
+Le chiffre est traité comme le sujet de la page : composé très grand
+en Fraunces, il est rempli par le motif de sillons défini dans le
+système de design. Une page d'erreur reste une invitation à agir,
+pas un cul-de-sac : deux issues explicites sont proposées.
+{% endcomment %}
+
 {% block title %}Page not found{% endblock title %}
+
 {% block content %}
-  <h1>Page not found</h1>
-  <p>
+
+<section class="adt-state" role="alert" aria-labelledby="adt-404-title">
+
+  <p class="adt-eyebrow adt-rise" style="--i: 0">{% translate "Introuvable" %}</p>
+
+  <p class="adt-state__code adt-rise" style="--i: 1" aria-hidden="true">404</p>
+
+  <h1 id="adt-404-title" class="adt-state__title adt-rise" style="--i: 2">
+    {% translate "Cette page n'existe pas — ou plus." %}
+  </h1>
+
+  <p class="adt-lede adt-rise" style="--i: 3">
+    {% translate "L'adresse saisie ne correspond à aucune ressource. Vérifiez le lien, ou repartez de l'accueil." %}
+  </p>
+
+  {# Détail technique : monospace et discret, sans jamais masquer l'action. #}
+  <p class="adt-state__detail adt-rise" style="--i: 4">
     {% if exception %}
-      {{ exception }}
+    {{ exception }}
     {% else %}
-      This is not the page you were looking for.
+    This is not the page you were looking for.
     {% endif %}
   </p>
+
+  <div class="adt-state__actions adt-rise" style="--i: 5">
+    <a class="btn btn-primary" href="{% url 'home' %}">
+      {% translate "Retour à l'accueil" %}
+    </a>
+    <a class="btn adt-btn-ghost" href="{% url 'about' %}">
+      {% translate "À propos du service" %}
+    </a>
+  </div>
+
+</section>
+
 {% endblock content %}

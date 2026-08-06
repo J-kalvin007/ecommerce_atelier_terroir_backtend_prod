@@ -1,10 +1,69 @@
 {% extends "base.html" %}
 
+{% load i18n %}
+
+{% comment %}
+Page 500 — erreur serveur.
+
+⚠ POINT DE FRAGILITÉ À CONNAÎTRE
+Django rend ce gabarit via `render_to_string` SANS RequestContext :
+aucun processeur de contexte n'est exécuté. En conséquence, dans ce
+gabarit et dans base.html tel qu'appelé depuis ici :
+
+· `request` est indéfini → les tests `request.user.is_authenticated`
+sont silencieusement faux (Django n'échoue pas sur une variable
+manquante) ; la navigation s'affiche donc en mode déconnecté ;
+· `messages` est indéfini → le bloc de messages ne s'affiche pas ;
+· `ACCOUNT_ALLOW_REGISTRATION` est indéfini → le lien d'inscription
+disparaît.
+
+En revanche `« url »`, `« static »` et les balises i18n
+fonctionnent : ce sont des balises, pas des variables de contexte.
+
+La dégradation est donc propre aujourd'hui. Elle cesserait de l'être
+si base.html venait à dépendre d'une variable issue d'un processeur de
+contexte pour son rendu structurel. Une variante autonome de cette
+page, n'héritant de rien, est décrite dans la note de livraison.
+
+Aucune variable de contexte n'est utilisée ci-dessous : c'est délibéré.
+{% endcomment %}
+
 {% block title %}Server Error{% endblock title %}
+
 {% block content %}
-  <h1>Ooops!!! 500</h1>
-  <h3>Looks like something went wrong!</h3>
-  <p>
-    We track these errors automatically, but if the problem persists feel free to contact us. In the meantime, try refreshing.
+
+<section class="adt-state" role="alert" aria-labelledby="adt-500-title">
+
+  <p class="adt-eyebrow adt-rise" style="--i: 0">{% translate "Erreur serveur" %}</p>
+
+  <p class="adt-state__code adt-rise" style="--i: 1" aria-hidden="true">500</p>
+
+  <h1 id="adt-500-title" class="adt-state__title adt-rise" style="--i: 2">
+    {% translate "Quelque chose s'est interrompu de notre côté." %}
+  </h1>
+
+  {% comment %}
+  La copie d'origine est conservée dans son intention : l'incident
+  est journalisé automatiquement, réessayer est la première action
+  utile. Elle est simplement écrite du point de vue de la personne
+  qui lit, et non de celui du système.
+  {% endcomment %}
+  <p class="adt-lede adt-rise" style="--i: 3">
+    {% translate "L'incident a été enregistré et remonté à l'équipe. Rechargez la page : la plupart de ces erreurs sont
+    passagères. Si elle persiste, revenez d'ici quelques minutes." %}
   </p>
+
+  <p class="adt-state__detail adt-rise" style="--i: 4">
+    We track these errors automatically, but if the problem persists feel free to contact us. In the meantime, try
+    refreshing.
+  </p>
+
+  <div class="adt-state__actions adt-rise" style="--i: 5">
+    <a class="btn btn-primary" href="{% url 'home' %}">
+      {% translate "Retour à l'accueil" %}
+    </a>
+  </div>
+
+</section>
+
 {% endblock content %}

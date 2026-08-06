@@ -1,41 +1,131 @@
 {% extends "base.html" %}
 
-{% load static %}
+{% load static i18n %}
+
+{% comment %}
+Fiche d'un utilisateur.
+
+Contrats conservés à l'identique :
+· variable de contexte `object` ;
+· garde `« if object == request.user »` autour des actions ;
+· les trois routes d'action : users:update, account_email, mfa_index ;
+· le marqueur de personnalisation en fin de bloc d'actions.
+
+Ajouts, tous additifs et protégés par une condition :
+· un médaillon d'initiales, qui évite d'introduire une dépendance à
+un champ image inexistant sur le modèle ;
+· un repli sur `get_username` lorsque `name` est vide, pour ne pas
+afficher un titre de page vide ;
+· les métadonnées standard d'AbstractUser, chacune sous condition.
+{% endcomment %}
 
 {% block title %}
-  User: 
-  
-    {{ object.name }}
-  
-  
+User:
+
+{{ object.name }}
+
+
 {% endblock title %}
+
 {% block content %}
-  <div class="container">
-    <div class="row">
-      <div class="col-sm-12">
-        <h2>
-        
-        
-          {{ object.name }}
-        
-      </h2>
+<div class="container">
+  <div class="row">
+    <div class="col-sm-12">
+
+      {# ── Identité ──────────────────────────────────────────────── #}
+      <header class="adt-identity adt-rise" style="--i: 0">
+
+        {% comment %}
+        Initiale composée à partir du premier caractère disponible.
+        `aria-hidden` : l'information est déjà portée par le titre,
+        la répéter au lecteur d'écran serait du bruit.
+        {% endcomment %}
+        <div class="adt-avatar" aria-hidden="true">
+          {% if object.name %}
+          {{ object.name|first|upper }}
+          {% elif object.email %}
+          {{ object.email|first|upper }}
+          {% else %}
+          &middot;
+          {% endif %}
+        </div>
+
+        <div>
+          <p class="adt-eyebrow">{% translate "Profil" %}</p>
+          <h1 class="adt-display" style="font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0.5rem 0 0">
+            {% if object.name %}
+            {{ object.name }}
+            {% else %}
+            {{ object.get_username }}
+            {% endif %}
+          </h1>
+        </div>
+
+      </header>
+
     </div>
   </div>
+
+  <hr class="adt-rule" />
+
+  {% comment %} ── Informations du compte ──────────────────────────────────────
+  Chaque ligne est conditionnée : un champ vide n'affiche pas
+  une étiquette orpheline. {% endcomment %}
+  <div class="row">
+    <div class="col-sm-12">
+      <section class="adt-card adt-rise" style="--i: 1" aria-labelledby="adt-user-info">
+
+        <h2 id="adt-user-info" class="adt-eyebrow" style="margin-bottom: 1.5rem">
+          {% translate "Informations du compte" %}
+        </h2>
+
+        <dl class="adt-fieldlist">
+
+          {% if object.email %}
+          <div>
+            <dt>{% translate "Adresse e-mail" %}</dt>
+            <dd>{{ object.email }}</dd>
+          </div>
+          {% endif %}
+
+          <div>
+            <dt>{% translate "Identifiant" %}</dt>
+            <dd>{{ object.get_username }}</dd>
+          </div>
+
+          {% if object.date_joined %}
+          <div>
+            <dt>{% translate "Inscrit depuis" %}</dt>
+            <dd>{{ object.date_joined|date:"j F Y" }}</dd>
+          </div>
+          {% endif %}
+
+          {% if object.last_login %}
+          <div>
+            <dt>{% translate "Dernière connexion" %}</dt>
+            <dd>{{ object.last_login|date:"j F Y, H:i" }}</dd>
+          </div>
+          {% endif %}
+
+        </dl>
+
+      </section>
+    </div>
+  </div>
+
   {% if object == request.user %}
-    <!-- Action buttons -->
-    <div class="row">
-      <div class="col-sm-12">
+  <!-- Action buttons -->
+  <div class="row">
+    <div class="col-sm-12">
+      <div class="adt-state__actions adt-rise" style="--i: 2; margin-top: clamp(1.5rem, 4vw, 2.5rem)">
         <a class="btn btn-primary" href="{% url 'users:update' %}" role="button">My Info</a>
-        <a class="btn btn-primary"
-           href="{% url 'account_email' %}"
-           role="button">E-Mail</a>
-        <a class="btn btn-primary"
-           href="{% url 'mfa_index' %}"
-           role="button">MFA</a>
+        <a class="btn adt-btn-ghost" href="{% url 'account_email' %}" role="button">E-Mail</a>
+        <a class="btn adt-btn-ghost" href="{% url 'mfa_index' %}" role="button">MFA</a>
         <!-- Your Stuff: Custom user template urls -->
       </div>
     </div>
-    <!-- End Action buttons -->
+  </div>
+  <!-- End Action buttons -->
   {% endif %}
 </div>
 {% endblock content %}

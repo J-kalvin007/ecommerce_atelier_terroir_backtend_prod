@@ -1,3 +1,126 @@
 {% extends "base.html" %}
 
+{% load i18n %}
 
+{% comment %}
+Page « À propos ».
+
+Structure en deux temps : une ouverture éditoriale, puis une liste
+de définitions décrivant le service. Le sommaire numéroté n'est pas
+décoratif — il encode une séquence réelle, celle du parcours d'une
+commande depuis le catalogue jusqu'à la remise au client.
+{% endcomment %}
+
+{% block title %}
+À propos — Atelier du Terroir
+{% endblock title %}
+
+{% block content %}
+
+{# ── Ouverture ────────────────────────────────────────────────────── #}
+<section aria-labelledby="adt-about-title" style="max-width: 62ch">
+
+    <p class="adt-eyebrow adt-rise" style="--i: 0">{% translate "À propos" %}</p>
+
+    <h1 id="adt-about-title" class="adt-display adt-rise" style="--i: 1; margin-top: 1rem">
+        Du champ <em>à la porte.</em>
+    </h1>
+
+    <p class="adt-lede adt-rise" style="--i: 2; margin-top: 1.5rem">
+        {% blocktranslate %}
+        Atelier du Terroir rassemble des produits agricoles togolais et les
+        achemine jusqu'aux clients. Ce service porte la partie qui ne se voit
+        pas : les données, les règles métier et les états par lesquels passe
+        chaque commande.
+        {% endblocktranslate %}
+    </p>
+
+</section>
+
+<hr class="adt-rule" />
+
+{% comment %} ── Le parcours d'une commande ───────────────────────────────────
+La numérotation porte ici une information réelle : l'ordre des
+étapes. Elle n'est pas un ornement de mise en page. {% endcomment %}
+<section aria-labelledby="adt-about-flow">
+
+    <h2 id="adt-about-flow" class="adt-eyebrow" style="margin-bottom: 1.75rem">
+        {% translate "Le parcours d'une commande" %}
+    </h2>
+
+    <div class="adt-card" data-adt-reveal>
+        <dl class="adt-fieldlist">
+
+            <div>
+                <dt>{% translate "01 — Catalogue" %}</dt>
+                <dd>{% translate "Le client choisit un produit et sa variante." %}</dd>
+            </div>
+
+            <div>
+                <dt>{% translate "02 — Panier" %}</dt>
+                <dd>{% translate "Les quantités sont réservées le temps du parcours." %}</dd>
+            </div>
+
+            <div>
+                <dt>{% translate "03 — Validation" %}</dt>
+                <dd>{% translate "Les montants sont figés, la commande reçoit sa référence." %}</dd>
+            </div>
+
+            <div>
+                <dt>{% translate "04 — Paiement" %}</dt>
+                <dd>{% translate "Portefeuille interne ou Mobile Money." %}</dd>
+            </div>
+
+            <div>
+                <dt>{% translate "05 — Livraison" %}</dt>
+                <dd>{% translate "Frais calculés à la distance, suivi jusqu'à la remise." %}</dd>
+            </div>
+
+        </dl>
+    </div>
+
+</section>
+
+<hr class="adt-rule" />
+
+{# ── Repères ──────────────────────────────────────────────────────── #}
+<section aria-labelledby="adt-about-facts">
+
+    <h2 id="adt-about-facts" class="adt-eyebrow" style="margin-bottom: 1.75rem">
+        {% translate "Repères" %}
+    </h2>
+
+    <div class="adt-grid">
+
+        <article class="adt-card adt-card--hover" data-adt-reveal>
+            <h3 style="font-size: 1.1rem; margin: 0 0 0.6rem">{% translate "Ancrage" %}</h3>
+            <p style="margin: 0; color: var(--adt-ink-60); font-size: 0.92rem">
+                {% translate "Lomé, Togo. Livraison locale et expédition internationale." %}
+            </p>
+        </article>
+
+        <article class="adt-card adt-card--hover" data-adt-reveal>
+            <h3 style="font-size: 1.1rem; margin: 0 0 0.6rem">{% translate "Monnaie" %}</h3>
+            <p style="margin: 0; color: var(--adt-ink-60); font-size: 0.92rem">
+                {% translate "Franc CFA (XOF), sur l'ensemble du parcours d'achat." %}
+            </p>
+        </article>
+
+        <article class="adt-card adt-card--hover" data-adt-reveal>
+            <h3 style="font-size: 1.1rem; margin: 0 0 0.6rem">{% translate "Fidélité" %}</h3>
+            <p style="margin: 0; color: var(--adt-ink-60); font-size: 0.92rem">
+                {% translate "Points cumulés à l'achat, convertibles en réduction." %}
+            </p>
+        </article>
+
+    </div>
+</section>
+
+{# ── Retour ───────────────────────────────────────────────────────── #}
+<div class="adt-state__actions" style="margin-top: clamp(2rem, 5vw, 3rem)">
+    <a class="btn adt-btn-ghost" href="{% url 'home' %}">
+        {% translate "Revenir à l'accueil" %}
+    </a>
+</div>
+
+{% endblock content %}

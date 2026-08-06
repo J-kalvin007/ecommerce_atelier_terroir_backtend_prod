@@ -1,3 +1,110 @@
 {% extends "base.html" %}
 
+{% load i18n %}
 
+{% comment %}
+Page d'accueil du service Django.
+
+Le storefront public est servi par l'application Next.js : cette page
+est la porte d'entrée du backend. Sa copie le dit sans détour plutôt
+que de simuler une vitrine — nommer les choses par ce qu'elles sont
+reste la manière la plus fiable d'orienter la personne.
+
+Aucune URL n'est écrite en dur : seules les routes déclarées dans
+l'URLconf du projet sont référencées via « url ».
+{% endcomment %}
+
+{% block title %}
+Atelier du Terroir — Plateforme
+{% endblock title %}
+
+{% block content %}
+
+{# ── Héros ────────────────────────────────────────────────────────── #}
+<section class="adt-state" aria-labelledby="adt-home-title">
+
+    <p class="adt-eyebrow adt-rise" style="--i: 0">{% translate "Plateforme" %}</p>
+
+    <h1 id="adt-home-title" class="adt-display adt-rise" style="--i: 1">
+        La logistique du goût,<br />
+        <em>d'un bout à l'autre.</em>
+    </h1>
+
+    <p class="adt-lede adt-rise" style="--i: 2">
+        {% blocktranslate %}
+        Ce service pilote le catalogue, les commandes, les livraisons et les
+        promotions d'Atelier du Terroir. La boutique visible par les clients
+        est servie séparément ; vous êtes ici du côté des opérations.
+        {% endblocktranslate %}
+    </p>
+
+    <div class="adt-state__actions adt-rise" style="--i: 3">
+        {% if request.user.is_authenticated %}
+        <a class="btn btn-primary" href="{% url 'users:detail' request.user.pk %}">
+            {% translate "Ouvrir mon profil" %}
+        </a>
+        <a class="btn adt-btn-ghost" href="{% url 'about' %}">
+            {% translate "À propos du service" %}
+        </a>
+        {% else %}
+        <a class="btn btn-primary" href="{% url 'account_login' %}">
+            {% translate "Se connecter" %}
+        </a>
+        <a class="btn adt-btn-ghost" href="{% url 'about' %}">
+            {% translate "À propos du service" %}
+        </a>
+        {% endif %}
+    </div>
+
+</section>
+
+<hr class="adt-rule" />
+
+{% comment %} ── Domaines couverts ────────────────────────────────────────────
+Contenu informatif, sans lien : ces modules ne sont pas exposés
+par des vues Django publiques. Inventer des URL ici produirait
+des liens morts. {% endcomment %}
+<section aria-labelledby="adt-home-scope">
+
+    <h2 id="adt-home-scope" class="adt-eyebrow" style="margin-bottom: 1.5rem">
+        {% translate "Domaines couverts" %}
+    </h2>
+
+    <div class="adt-grid">
+
+        <article class="adt-card adt-card--hover" data-adt-reveal>
+            <p class="adt-meta">01</p>
+            <h3 style="font-size: 1.15rem; margin: 0.5rem 0 0.6rem">{% translate "Catalogue" %}</h3>
+            <p style="margin: 0; color: var(--adt-ink-60); font-size: 0.92rem">
+                {% translate "Produits, variantes, stocks et catégories." %}
+            </p>
+        </article>
+
+        <article class="adt-card adt-card--hover" data-adt-reveal>
+            <p class="adt-meta">02</p>
+            <h3 style="font-size: 1.15rem; margin: 0.5rem 0 0.6rem">{% translate "Commandes" %}</h3>
+            <p style="margin: 0; color: var(--adt-ink-60); font-size: 0.92rem">
+                {% translate "Panier, validation, historique des statuts." %}
+            </p>
+        </article>
+
+        <article class="adt-card adt-card--hover" data-adt-reveal>
+            <p class="adt-meta">03</p>
+            <h3 style="font-size: 1.15rem; margin: 0.5rem 0 0.6rem">{% translate "Livraisons" %}</h3>
+            <p style="margin: 0; color: var(--adt-ink-60); font-size: 0.92rem">
+                {% translate "Frais au kilomètre, suivi, affectation." %}
+            </p>
+        </article>
+
+        <article class="adt-card adt-card--hover" data-adt-reveal>
+            <p class="adt-meta">04</p>
+            <h3 style="font-size: 1.15rem; margin: 0.5rem 0 0.6rem">{% translate "Promotions" %}</h3>
+            <p style="margin: 0; color: var(--adt-ink-60); font-size: 0.92rem">
+                {% translate "Codes, ventes flash, bannières." %}
+            </p>
+        </article>
+
+    </div>
+</section>
+
+{% endblock content %}

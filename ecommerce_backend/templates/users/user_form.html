@@ -1,31 +1,76 @@
 {% extends "base.html" %}
 
-{% load crispy_forms_tags %}
+{% load crispy_forms_tags i18n %}
+
+{% comment %}
+Édition du profil.
+
+Contrats conservés à l'identique :
+· `« load crispy_forms_tags »` et le rendu `« form|crispy »` ;
+· l'action du formulaire : « url 'users:update' » ;
+· la méthode POST et le jeton « csrf_token » ;
+· les classes `form-horizontal`, `control-group` et `controls`.
+
+Note sur ces trois classes : ce sont des vestiges de Bootstrap 2/3,
+sans effet en Bootstrap 5. Elles sont conservées telles quelles — les
+retirer relèverait d'un nettoyage de balisage, hors du périmètre de
+cette refonte visuelle. Elles sont signalées dans la note de livraison.
+
+Le champ de saisie lui-même n'est pas touché : crispy émet
+`form-control`, `form-label`, `invalid-feedback`, et ces sélecteurs
+sont habillés dans le système de design de base.html. C'est la raison
+pour laquelle Bootstrap doit rester chargé.
+{% endcomment %}
 
 {% block title %}
 
 
-  {{ user.name }}
+{{ user.name }}
 
 
 {% endblock title %}
+
 {% block content %}
-  <h1>
-  
-  
+
+{# ── En-tête ──────────────────────────────────────────────────────── #}
+<header class="adt-rise" style="--i: 0; max-width: 62ch">
+
+  <p class="adt-eyebrow">{% translate "Mon compte" %}</p>
+
+  <h1 class="adt-display" style="font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0.75rem 0 0">
+
+
     {{ user.name }}
-  
-  
-</h1>
-<form class="form-horizontal"
-      method="post"
-      action="{% url 'users:update' %}">
-  {% csrf_token %}
-  {{ form|crispy }}
-  <div class="control-group">
-    <div class="controls">
-      <button type="submit" class="btn btn-primary">Update</button>
+
+
+  </h1>
+
+  <p class="adt-lede" style="margin-top: 1rem">
+    {% translate "Modifiez vos informations, puis enregistrez. Les changements prennent effet immédiatement." %}
+  </p>
+
+</header>
+
+{% comment %} ── Formulaire ───────────────────────────────────────────────────
+Le rendu crispy est encadré par une carte : la mise en forme des
+champs, elle, provient entièrement du système de design. {% endcomment %}
+<div class="adt-card adt-rise" style="--i: 1; max-width: 620px; margin-top: clamp(1.75rem, 4vw, 2.5rem)">
+
+  <form class="form-horizontal" method="post" action="{% url 'users:update' %}" novalidate>
+    {% csrf_token %}
+    {{ form|crispy }}
+    <div class="control-group">
+      <div class="controls">
+        <div class="adt-state__actions" style="margin-top: 1.5rem">
+          <button type="submit" class="btn btn-primary">Update</button>
+          <a class="btn adt-btn-ghost" href="{% url 'users:detail' request.user.pk %}">
+            {% translate "Annuler" %}
+          </a>
+        </div>
+      </div>
     </div>
-  </div>
-</form>
+  </form>
+
+</div>
+
 {% endblock content %}

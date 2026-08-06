@@ -1,71 +1,976 @@
-
-{% load static i18n %}<!DOCTYPE html>
+{% load static i18n %}
+<!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 <html lang="{{ LANGUAGE_CODE }}">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="x-ua-compatible" content="ie=edge" />
-    <title>
-      {% block title %}
-      ecommerce_backend
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="x-ua-compatible" content="ie=edge" />
+  <title>
+    {% block title %}
+    ecommerce_backend
     {% endblock title %}
   </title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description"
-        content="Super site de e-commerce complet Juin 2026" />
-  <meta name="author"
-        content="Takoudjou Kalvin Moise" />
+  <meta name="description" content="Super site de e-commerce complet Juin 2026" />
+  <meta name="author" content="Takoudjou Kalvin Moise" />
+  {# Couleur de la barre d'adresse mobile : aligne le chrome du navigateur sur la charte. #}
+  <meta name="theme-color" content="#0D2E1E" />
   <link rel="icon" href="{% static 'images/favicons/favicon.ico' %}" />
   {% block css %}
-    <!-- Latest compiled and minified Bootstrap CSS -->
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/css/bootstrap.min.css"
-          integrity="sha512-SbiR/eusphKoMVVXysTKG/7VseWii+Y3FdHrt0EpKgpToZeemhqHeZeLWLhJutz/2ut2Vw1uQEj2MbRF+TVBUA=="
-          crossorigin="anonymous"
-          referrerpolicy="no-referrer" />
-<!-- Your stuff: Third-party CSS libraries go here -->
-<!-- This file stores project-specific CSS -->
+  <!-- Latest compiled and minified Bootstrap CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/css/bootstrap.min.css"
+    integrity="sha512-SbiR/eusphKoMVVXysTKG/7VseWii+Y3FdHrt0EpKgpToZeemhqHeZeLWLhJutz/2ut2Vw1uQEj2MbRF+TVBUA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Your stuff: Third-party CSS libraries go here -->
 
-  
+  {% comment %}
+  Typographie de marque.
+  - Fraunces : serif variable (axes opsz + wght) pour les titres éditoriaux.
+  - Manrope : sans humaniste géométrique pour le corps et l'interface.
+  `display=swap` évite tout blocage du rendu ; la pile de repli système
+  est déclarée dans les jetons plus bas.
+  {% endcomment %}
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Manrope:wght@300..800&display=swap" />
+
+  <!-- This file stores project-specific CSS -->
+
+
   <link href="{% static 'css/project.css' %}" rel="stylesheet" />
 
 
-{% endblock css %}
-<!-- Le javascript
+  {% comment %}
+  ══════════════════════════════════════════════════════════════════════
+  SYSTÈME DE DESIGN « ATELIER DU TERROIR » — couche d'habillage
+  ══════════════════════════════════════════════════════════════════════
+
+  POSITION DANS LA CASCADE
+  Cette feuille est déclarée APRÈS Bootstrap et APRÈS project.css :
+  elle remporte donc les conflits de spécificité égale sans recourir
+  à `!important`, sauf pour les rares utilitaires Bootstrap qui en
+  portent un nativement (`.bg-light`, `.text-*`).
+
+  POURQUOI BOOTSTRAP EST CONSERVÉ
+  `django-crispy-forms` génère du balisage Bootstrap 5 (`form-control`,
+  `form-label`, `invalid-feedback`, `form-check`…). Retirer Bootstrap
+  casserait le rendu de `« form|crispy »` dans users/user_form.html.
+  La stratégie retenue est donc l'habillage : on redéfinit les variables
+  CSS `--bs-*` exposées par Bootstrap 5.2, puis on cible explicitement
+  les composants que crispy émet.
+
+  CONVENTION DE NOMMAGE
+  Toutes les classes propres au projet sont préfixées `adt-`
+  (Atelier du Terroir) afin de ne jamais entrer en collision avec
+  Bootstrap ni avec project.css.
+
+  SIGNATURE VISUELLE — « les sillons »
+  Un motif de lignes parallèles inclinées, évoquant les sillons d'une
+  parcelle labourée. Il n'apparaît qu'à deux endroits : en voile ambiant
+  derrière les en-têtes, et à l'intérieur même des chiffres des pages
+  d'erreur. Une seule idée, employée deux fois.
+  {% endcomment %}
+  <style>
+    /* ══ 1. JETONS ═══════════════════════════════════════════════════ */
+
+    :root {
+      /* Palette de marque — reprise à l'identique du storefront Next.js. */
+      --adt-forest: #1f4d3f;
+      /* vert de marque                    */
+      --adt-forest-deep: #0D2E1E;
+      /* vert profond, fonds sombres       */
+      --adt-forest-soft: #2d7a63;
+      /* vert clair, dégradés              */
+      --adt-gold: #c9a876;
+      /* champagne, accents de précision   */
+      --adt-gold-deep: #B8924A;
+      /* or soutenu, texte sur clair       */
+      --adt-cream: #f9f6ee;
+      /* fond de page                      */
+      --adt-cream-warm: #fbf7e8;
+      /* fond alternatif, plus chaud       */
+      --adt-ink: #1f241c;
+      /* texte principal                   */
+      --adt-clay: #E8711A;
+      /* braise — usage exceptionnel       */
+
+      /* Dérivés translucides (jamais de couleur en dur dans les règles). */
+      --adt-ink-60: rgba(31, 36, 28, 0.60);
+      --adt-ink-45: rgba(31, 36, 28, 0.45);
+      --adt-hairline: rgba(31, 77, 63, 0.14);
+      --adt-hairline-warm: rgba(201, 168, 118, 0.38);
+      --adt-forest-wash: rgba(31, 77, 63, 0.05);
+      --adt-gold-wash: rgba(201, 168, 118, 0.14);
+
+      /* Typographie — trois rôles distincts. */
+      --adt-font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+      --adt-font-body: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --adt-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+      /* Rythme et géométrie. */
+      --adt-rail: 1180px;
+      /* largeur maximale du contenu */
+      --adt-radius: 18px;
+      --adt-radius-sm: 12px;
+      --adt-radius-pill: 999px;
+
+      /* Courbes d'animation — une seule famille, pour la cohérence. */
+      --adt-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --adt-ease-soft: cubic-bezier(0.16, 1, 0.30, 1);
+
+      /* Motif « sillons » : la signature, déclarée une fois et réutilisée. */
+      --adt-sillons: repeating-linear-gradient(102deg,
+          var(--adt-hairline) 0 1px,
+          transparent 1px 11px);
+    }
+
+    /* ══ 2. PONT VERS LES VARIABLES BOOTSTRAP ════════════════════════ */
+    /* Redéfinir les jetons de Bootstrap propage la charte à tout le
+         balisage généré (crispy, alertes, boutons) sans le réécrire.     */
+
+    :root {
+      --bs-body-font-family: var(--adt-font-body);
+      --bs-body-color: var(--adt-ink);
+      --bs-body-bg: var(--adt-cream);
+      --bs-border-color: var(--adt-hairline);
+      --bs-border-radius: var(--adt-radius-sm);
+      --bs-primary: var(--adt-forest);
+      --bs-primary-rgb: 31, 77, 63;
+      --bs-link-color: var(--adt-forest);
+      --bs-link-hover-color: var(--adt-gold-deep);
+      --bs-light-rgb: 249, 246, 238;
+      --bs-emphasis-color: var(--adt-ink);
+    }
+
+    /* ══ 3. SOCLE ════════════════════════════════════════════════════ */
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      font-family: var(--adt-font-body);
+      color: var(--adt-ink);
+      background-color: var(--adt-cream);
+      font-size: 1rem;
+      line-height: 1.65;
+      font-weight: 400;
+      letter-spacing: -0.005em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Le voile ambiant : halos très doux + sillons. Purement décoratif,
+         fixé au viewport pour ne jamais entrer dans le flux du document.  */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        radial-gradient(42% 32% at 8% 0%, var(--adt-forest-wash), transparent 68%),
+        radial-gradient(38% 28% at 100% 6%, var(--adt-gold-wash), transparent 70%),
+        var(--adt-sillons);
+      opacity: 0.9;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-family: var(--adt-font-display);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.12;
+      color: var(--adt-ink);
+      font-variation-settings: "opsz" 96, "SOFT" 0;
+    }
+
+    a {
+      text-decoration: none;
+      transition: color 0.25s var(--adt-ease);
+    }
+
+    ::selection {
+      background: var(--adt-gold-wash);
+      color: var(--adt-forest-deep);
+    }
+
+    /* ══ 4. MOUVEMENT ════════════════════════════════════════════════ */
+    /* Toutes les entrées passent par une seule animation, décalée par
+         la variable `--i` posée sur l'élément. Un seul point de coupure
+         pour `prefers-reduced-motion`, à la fin de la section.            */
+
+    @keyframes adt-rise {
+      from {
+        opacity: 0;
+        transform: translate3d(0, 14px, 0);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @keyframes adt-draw {
+      from {
+        transform: scaleX(0);
+      }
+
+      to {
+        transform: scaleX(1);
+      }
+    }
+
+    @keyframes adt-sheen {
+      from {
+        transform: translateX(-120%) skewX(-18deg);
+      }
+
+      to {
+        transform: translateX(240%) skewX(-18deg);
+      }
+    }
+
+    .adt-rise {
+      animation: adt-rise 0.62s var(--adt-ease-soft) both;
+      animation-delay: calc(var(--i, 0) * 80ms);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* ══ 5. ACCESSIBILITÉ ════════════════════════════════════════════ */
+
+    .adt-skip {
+      position: absolute;
+      left: 1rem;
+      top: -100%;
+      z-index: 1080;
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--adt-radius-sm);
+      background: var(--adt-forest-deep);
+      color: var(--adt-cream);
+      font-size: 0.875rem;
+      font-weight: 700;
+      transition: top 0.25s var(--adt-ease);
+    }
+
+    .adt-skip:focus {
+      top: 1rem;
+      color: var(--adt-cream);
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--adt-gold-deep);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    /* ══ 6. NAVIGATION ═══════════════════════════════════════════════ */
+    /* La structure Bootstrap est conservée intégralement (collapse,
+         data-bs-*, navbar-expand-md) : seul l'habillage change.           */
+
+    .navbar {
+      --bs-navbar-padding-y: 0.9rem;
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+      background-color: rgba(249, 246, 238, 0.82) !important;
+      backdrop-filter: saturate(1.6) blur(16px);
+      -webkit-backdrop-filter: saturate(1.6) blur(16px);
+      border-bottom: 1px solid var(--adt-hairline);
+      transition: box-shadow 0.35s var(--adt-ease),
+        background-color 0.35s var(--adt-ease);
+    }
+
+    /* Classe posée par le script de fin de document au défilement. */
+    .navbar.adt-nav--scrolled {
+      background-color: rgba(249, 246, 238, 0.94) !important;
+      box-shadow: 0 1px 0 var(--adt-hairline), 0 18px 40px -32px rgba(13, 46, 30, 0.55);
+    }
+
+    .navbar .container-fluid {
+      max-width: var(--adt-rail);
+      margin-inline: auto;
+      padding-inline: clamp(1rem, 4vw, 2rem);
+    }
+
+    /* Marque : le nom en display, souligné d'un fil d'or qui se trace. */
+    .navbar-brand {
+      position: relative;
+      font-family: var(--adt-font-display);
+      font-size: 1.32rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--adt-forest-deep);
+      padding-block: 0.15rem;
+    }
+
+    .navbar-brand::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -2px;
+      height: 1.5px;
+      transform-origin: left;
+      background: linear-gradient(90deg, var(--adt-gold-deep), var(--adt-gold), transparent);
+      animation: adt-draw 0.9s var(--adt-ease-soft) 0.25s both;
+    }
+
+    .navbar-brand:hover {
+      color: var(--adt-forest);
+    }
+
+    .navbar-nav {
+      gap: 0.15rem;
+    }
+
+    .navbar .nav-link {
+      position: relative;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--adt-ink-60);
+      padding: 0.5rem 0.9rem;
+      border-radius: var(--adt-radius-sm);
+      transition: color 0.25s var(--adt-ease), background-color 0.25s var(--adt-ease);
+    }
+
+    .navbar .nav-link:hover,
+    .navbar .nav-link:focus-visible {
+      color: var(--adt-forest-deep);
+      background-color: var(--adt-forest-wash);
+    }
+
+    /* Le fil d'or sous l'onglet : croît depuis la gauche. */
+    .navbar .nav-link::after {
+      content: "";
+      position: absolute;
+      left: 0.9rem;
+      right: 0.9rem;
+      bottom: 0.28rem;
+      height: 1.5px;
+      background: var(--adt-gold-deep);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.32s var(--adt-ease);
+    }
+
+    .navbar .nav-link:hover::after,
+    .navbar .nav-item.active .nav-link::after {
+      transform: scaleX(1);
+    }
+
+    .navbar .nav-item.active .nav-link {
+      color: var(--adt-forest-deep);
+    }
+
+    /* Bouton hamburger : cadre filaire, sans l'icône bitmap de Bootstrap. */
+    .navbar-toggler {
+      border: 1px solid var(--adt-hairline);
+      border-radius: var(--adt-radius-sm);
+      padding: 0.45rem 0.6rem;
+      transition: border-color 0.25s var(--adt-ease), background-color 0.25s var(--adt-ease);
+    }
+
+    .navbar-toggler:hover {
+      border-color: var(--adt-hairline-warm);
+      background: var(--adt-forest-wash);
+    }
+
+    .navbar-toggler:focus {
+      box-shadow: none;
+    }
+
+    .navbar-toggler-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%231f4d3f' stroke-width='2' stroke-linecap='round' d='M5 8h20M5 15h20M5 22h20'/%3E%3C/svg%3E");
+      width: 1.35em;
+      height: 1.35em;
+    }
+
+    /* Repli mobile : les liens entrent en cascade à l'ouverture. */
+    @media (max-width: 767.98px) {
+      .navbar-collapse {
+        padding-block: 0.75rem 0.25rem;
+      }
+
+      .navbar-collapse.show .nav-item {
+        animation: adt-rise 0.4s var(--adt-ease-soft) both;
+      }
+
+      .navbar-collapse.show .nav-item:nth-child(1) {
+        animation-delay: 40ms;
+      }
+
+      .navbar-collapse.show .nav-item:nth-child(2) {
+        animation-delay: 80ms;
+      }
+
+      .navbar-collapse.show .nav-item:nth-child(3) {
+        animation-delay: 120ms;
+      }
+
+      .navbar-collapse.show .nav-item:nth-child(4) {
+        animation-delay: 160ms;
+      }
+
+      .navbar .nav-link::after {
+        left: 0.9rem;
+        right: auto;
+        width: 22px;
+      }
+    }
+
+    /* ══ 7. MESSAGES ═════════════════════════════════════════════════ */
+    /* Django émet le tag `error`, or Bootstrap ne connaît que
+         `alert-danger` : `.alert-error` et `.alert-debug` sont donc
+         stylés explicitement ci-dessous, sans quoi ils resteraient nus.  */
+
+    .alert {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--adt-hairline);
+      border-radius: var(--adt-radius);
+      background: #fff;
+      color: var(--adt-ink);
+      padding: 1rem 3rem 1rem 1.25rem;
+      font-size: 0.94rem;
+      box-shadow: 0 18px 40px -34px rgba(13, 46, 30, 0.5);
+      animation: adt-rise 0.5s var(--adt-ease-soft) both;
+    }
+
+    /* Liseré coloré à gauche : porte à lui seul la sémantique. */
+    .alert::before {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      left: 0;
+      width: 3px;
+      background: var(--adt-forest);
+    }
+
+    .alert-success::before {
+      background: var(--adt-forest-soft);
+    }
+
+    .alert-info::before {
+      background: var(--adt-forest);
+    }
+
+    .alert-warning::before {
+      background: var(--adt-gold-deep);
+    }
+
+    .alert-danger::before,
+    .alert-error::before {
+      background: #c0453b;
+    }
+
+    .alert-debug::before {
+      background: var(--adt-ink-45);
+    }
+
+    .alert-success,
+    .alert-info,
+    .alert-warning,
+    .alert-danger,
+    .alert-error,
+    .alert-debug {
+      background: #fff;
+      color: var(--adt-ink);
+      border-color: var(--adt-hairline);
+    }
+
+    .alert .btn-close {
+      top: 50%;
+      transform: translateY(-50%);
+      right: 1rem;
+      padding: 0.5rem;
+      opacity: 0.4;
+      transition: opacity 0.2s var(--adt-ease);
+    }
+
+    .alert .btn-close:hover {
+      opacity: 1;
+    }
+
+    /* ══ 8. PRIMITIVES DE MISE EN PAGE ═══════════════════════════════ */
+
+    .adt-main {
+      flex: 1 0 auto;
+      width: 100%;
+      max-width: var(--adt-rail);
+      margin-inline: auto;
+      padding-inline: clamp(1rem, 4vw, 2rem);
+      padding-block: clamp(2.5rem, 6vw, 4.5rem);
+    }
+
+    /* Surcharge du conteneur Bootstrap existant, dont le balisage est
+         conservé dans le corps du document.                              */
+    body>.container,
+    .adt-main>.container {
+      max-width: 100%;
+      padding-inline: 0;
+    }
+
+    .adt-card {
+      position: relative;
+      background: #fff;
+      border: 1px solid var(--adt-hairline);
+      border-radius: var(--adt-radius);
+      padding: clamp(1.5rem, 4vw, 2.75rem);
+      transition: border-color 0.35s var(--adt-ease), transform 0.35s var(--adt-ease);
+    }
+
+    .adt-card--hover:hover {
+      border-color: var(--adt-hairline-warm);
+      transform: translateY(-2px);
+    }
+
+    .adt-grid {
+      display: grid;
+      gap: clamp(1rem, 2.5vw, 1.5rem);
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    }
+
+    .adt-rule {
+      height: 1px;
+      border: 0;
+      margin-block: clamp(2rem, 5vw, 3.5rem);
+      background: linear-gradient(90deg, var(--adt-hairline), transparent);
+      opacity: 1;
+    }
+
+    /* ══ 9. TYPOGRAPHIE APPLIQUÉE ════════════════════════════════════ */
+
+    /* Sur-titre en petites capitales très espacées : le repère de
+         hiérarchie de la charte, déjà employé côté storefront.           */
+    .adt-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--adt-font-body);
+      font-size: 0.688rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.32em;
+      color: var(--adt-gold-deep);
+    }
+
+    .adt-eyebrow::before {
+      content: "";
+      width: 26px;
+      height: 1.5px;
+      background: var(--adt-gold-deep);
+      transform-origin: left;
+      animation: adt-draw 0.7s var(--adt-ease-soft) 0.2s both;
+    }
+
+    .adt-display {
+      font-family: var(--adt-font-display);
+      font-size: clamp(2.1rem, 5.6vw, 3.5rem);
+      font-weight: 400;
+      line-height: 1.06;
+      letter-spacing: -0.03em;
+      font-variation-settings: "opsz" 144, "SOFT" 0;
+    }
+
+    /* Un seul mot en italique optique : l'accent éditorial. */
+    .adt-display em {
+      font-style: italic;
+      font-weight: 500;
+      color: var(--adt-forest);
+      font-variation-settings: "opsz" 144, "SOFT" 40, "WONK" 1;
+    }
+
+    .adt-lede {
+      max-width: 58ch;
+      font-size: clamp(1rem, 1.6vw, 1.075rem);
+      line-height: 1.75;
+      color: var(--adt-ink-60);
+    }
+
+    .adt-meta {
+      font-family: var(--adt-font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      color: var(--adt-ink-45);
+      text-transform: uppercase;
+    }
+
+    /* ══ 10. BOUTONS ═════════════════════════════════════════════════ */
+
+    .btn {
+      --bs-btn-border-radius: var(--adt-radius-sm);
+      position: relative;
+      overflow: hidden;
+      font-family: var(--adt-font-body);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.005em;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--adt-radius-sm);
+      transition: transform 0.3s var(--adt-ease),
+        box-shadow 0.3s var(--adt-ease),
+        background-color 0.3s var(--adt-ease),
+        border-color 0.3s var(--adt-ease),
+        color 0.3s var(--adt-ease);
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    /* Balayage de lumière au survol : la micro-interaction signature. */
+    .btn::after {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      left: 0;
+      width: 45%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+      transform: translateX(-120%) skewX(-18deg);
+      pointer-events: none;
+    }
+
+    .btn:hover::after {
+      animation: adt-sheen 0.75s var(--adt-ease) both;
+    }
+
+    .btn-primary {
+      --bs-btn-bg: var(--adt-forest);
+      --bs-btn-border-color: var(--adt-forest);
+      --bs-btn-hover-bg: var(--adt-forest-deep);
+      --bs-btn-hover-border-color: var(--adt-forest-deep);
+      --bs-btn-active-bg: var(--adt-forest-deep);
+      --bs-btn-color: #fff;
+      --bs-btn-hover-color: #fff;
+      box-shadow: 0 16px 34px -22px rgba(31, 77, 63, 0.85);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 20px 40px -20px rgba(31, 77, 63, 0.9);
+    }
+
+    /* Variante filaire du projet, employée pour les actions secondaires. */
+    .adt-btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: transparent;
+      border: 1px solid var(--adt-hairline);
+      color: var(--adt-forest-deep);
+    }
+
+    .adt-btn-ghost:hover {
+      border-color: var(--adt-forest);
+      background: var(--adt-forest-wash);
+      color: var(--adt-forest-deep);
+    }
+
+    /* ══ 11. FORMULAIRES (cibles émises par crispy-forms) ════════════ */
+
+    .form-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--adt-ink-60);
+      margin-bottom: 0.45rem;
+    }
+
+    .form-control,
+    .form-select {
+      font-family: var(--adt-font-body);
+      font-size: 0.975rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid var(--adt-hairline);
+      border-radius: var(--adt-radius-sm);
+      background-color: #fff;
+      color: var(--adt-ink);
+      transition: border-color 0.25s var(--adt-ease), box-shadow 0.25s var(--adt-ease);
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+      border-color: var(--adt-forest);
+      box-shadow: 0 0 0 4px rgba(31, 77, 63, 0.10);
+      outline: none;
+    }
+
+    .form-control::placeholder {
+      color: var(--adt-ink-45);
+    }
+
+    .form-check-input {
+      border-color: var(--adt-hairline);
+    }
+
+    .form-check-input:checked {
+      background-color: var(--adt-forest);
+      border-color: var(--adt-forest);
+    }
+
+    .form-check-input:focus {
+      box-shadow: 0 0 0 4px rgba(31, 77, 63, 0.10);
+    }
+
+    .form-text,
+    .helptext {
+      font-size: 0.8rem;
+      color: var(--adt-ink-45);
+    }
+
+    .invalid-feedback,
+    .errorlist {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #c0453b;
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .is-invalid,
+    .form-control.is-invalid {
+      border-color: #c0453b;
+      background-image: none;
+      /* neutralise l'icône Bootstrap, trop bruyante */
+    }
+
+    .form-control.is-invalid:focus {
+      box-shadow: 0 0 0 4px rgba(192, 69, 59, 0.10);
+    }
+
+    .asteriskField {
+      color: var(--adt-gold-deep);
+      margin-left: 0.15rem;
+    }
+
+    /* ══ 12. PIED DE PAGE ════════════════════════════════════════════ */
+
+    .adt-footer {
+      flex-shrink: 0;
+      margin-top: auto;
+      border-top: 1px solid var(--adt-hairline);
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .adt-footer__inner {
+      max-width: var(--adt-rail);
+      margin-inline: auto;
+      padding: 2rem clamp(1rem, 4vw, 2rem);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 2rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .adt-footer__mark {
+      font-family: var(--adt-font-display);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--adt-forest-deep);
+    }
+
+    /* ══ 13. PAGES D'ÉTAT (403 / 404 / 500) ══════════════════════════ */
+    /* Le chiffre est le sujet de la page : composé en Fraunces très
+         grand, et rempli par le motif de sillons — la signature revient
+         ici sous sa forme la plus lisible.                                */
+
+    .adt-state {
+      display: grid;
+      gap: clamp(1.25rem, 3vw, 2rem);
+      align-content: center;
+      min-height: clamp(340px, 52vh, 560px);
+      max-width: 62ch;
+    }
+
+    .adt-state__code {
+      font-family: var(--adt-font-display);
+      font-size: clamp(5.5rem, 20vw, 12rem);
+      font-weight: 300;
+      line-height: 0.82;
+      letter-spacing: -0.045em;
+      font-variation-settings: "opsz" 144;
+      background-image:
+        repeating-linear-gradient(102deg,
+          rgba(255, 255, 255, 0.62) 0 2px,
+          transparent 2px 8px),
+        linear-gradient(168deg, var(--adt-forest-deep) 0%, var(--adt-forest) 55%, var(--adt-gold-deep) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .adt-state__title {
+      font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+      font-weight: 400;
+      font-variation-settings: "opsz" 96, "SOFT" 20;
+    }
+
+    .adt-state__detail {
+      font-family: var(--adt-font-mono);
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: var(--adt-ink-60);
+      padding: 0.9rem 1.1rem;
+      border-left: 2px solid var(--adt-hairline-warm);
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 0 var(--adt-radius-sm) var(--adt-radius-sm) 0;
+      overflow-wrap: anywhere;
+    }
+
+    .adt-state__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    /* ══ 14. FICHE UTILISATEUR ═══════════════════════════════════════ */
+
+    .adt-identity {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: clamp(1rem, 3vw, 1.75rem);
+    }
+
+    /* Médaillon d'initiales : évite une dépendance à un fichier image. */
+    .adt-avatar {
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      width: 84px;
+      height: 84px;
+      border-radius: var(--adt-radius-pill);
+      font-family: var(--adt-font-display);
+      font-size: 1.9rem;
+      font-weight: 500;
+      color: var(--adt-cream);
+      background: linear-gradient(145deg, var(--adt-forest-deep), var(--adt-forest-soft));
+      border: 1px solid var(--adt-hairline-warm);
+      text-transform: uppercase;
+    }
+
+    .adt-fieldlist {
+      display: grid;
+      gap: 0.85rem;
+      margin: 0;
+    }
+
+    .adt-fieldlist>div {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 1rem;
+      justify-content: space-between;
+      align-items: baseline;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px solid var(--adt-hairline);
+    }
+
+    .adt-fieldlist>div:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .adt-fieldlist dt {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--adt-ink-45);
+    }
+
+    .adt-fieldlist dd {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--adt-ink);
+      overflow-wrap: anywhere;
+    }
+
+    /* ══ 15. RESPONSIVE ══════════════════════════════════════════════ */
+
+    @media (max-width: 575.98px) {
+      .adt-avatar {
+        width: 68px;
+        height: 68px;
+        font-size: 1.5rem;
+      }
+
+      .adt-state__actions .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .adt-footer__inner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+
+  {% endblock css %}
+  <!-- Le javascript
     ================================================== -->
-{# Placed at the top of the document so pages load faster with defer #}
-{% block javascript %}
+  {# Placed at the top of the document so pages load faster with defer #}
+  {% block javascript %}
 
 
-<!-- Bootstrap JS -->
-<script defer
-        src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.min.js"
-        integrity="sha512-1/RvZTcCDEUjY/CypiMz+iqqtaoQfAITmNSJY17Myp4Ms5mdxPS5UV7iOfdZoxcGhzFbOm6sntTKJppjvuhg4g=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer"></script>
-<!-- Your stuff: Third-party javascript libraries go here -->
+  <!-- Bootstrap JS -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.min.js"
+    integrity="sha512-1/RvZTcCDEUjY/CypiMz+iqqtaoQfAITmNSJY17Myp4Ms5mdxPS5UV7iOfdZoxcGhzFbOm6sntTKJppjvuhg4g=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Your stuff: Third-party javascript libraries go here -->
 
 
-<!-- place project specific Javascript in this file -->
+  <!-- place project specific Javascript in this file -->
 
-  
+
   <script defer src="{% static 'js/project.js' %}"></script>
 
 
-{% endblock javascript %}
+  {% endblock javascript %}
 </head>
+
 <body class="{% block bodyclass %}{% endblock bodyclass %}">
   {% block body %}
+
+  {# Lien d'évitement : premier élément focalisable du document. #}
+  <a class="adt-skip" href="#adt-content">{% translate "Aller au contenu" %}</a>
+
   <div class="mb-1">
     <nav class="navbar navbar-expand-md navbar-light bg-light">
       <div class="container-fluid">
-        <button class="navbar-toggler navbar-toggler-right"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#navbarSupportedContent"
-                aria-controls="navbarSupportedContent"
-                aria-expanded="false"
-                aria-label="Toggle navigation">
+        <button class="navbar-toggler navbar-toggler-right" type="button" data-bs-toggle="collapse"
+          data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+          aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
         <a class="navbar-brand" href="{% url 'home' %}">ecommerce_backend</a>
@@ -78,64 +983,115 @@
               <a class="nav-link" href="{% url 'about' %}">About</a>
             </li>
             {% if request.user.is_authenticated %}
-              <li class="nav-item">
-                <a class="nav-link"
-                   href="{% url 'users:detail' request.user.pk %}">{% translate "My Profile" %}</a>
-              </li>
-              <li class="nav-item">
-                {# URL provided by django-allauth/account/urls.py #}
-                <a class="nav-link" href="{% url 'account_logout' %}">{% translate "Sign Out" %}</a>
-              </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'users:detail' request.user.pk %}">{% translate "My Profile" %}</a>
+            </li>
+            <li class="nav-item">
+              {# URL provided by django-allauth/account/urls.py #}
+              <a class="nav-link" href="{% url 'account_logout' %}">{% translate "Sign Out" %}</a>
+            </li>
             {% else %}
-              {% if ACCOUNT_ALLOW_REGISTRATION %}
-                <li class="nav-item">
-                  {# URL provided by django-allauth/account/urls.py #}
-                  <a id="sign-up-link" class="nav-link" href="{% url 'account_signup' %}">{% translate "Sign Up" %}</a>
-                </li>
-              {% endif %}
-              <li class="nav-item">
-                {# URL provided by django-allauth/account/urls.py #}
-                <a id="log-in-link" class="nav-link" href="{% url 'account_login' %}">{% translate "Sign In" %}</a>
-              </li>
+            {% if ACCOUNT_ALLOW_REGISTRATION %}
+            <li class="nav-item">
+              {# URL provided by django-allauth/account/urls.py #}
+              <a id="sign-up-link" class="nav-link" href="{% url 'account_signup' %}">{% translate "Sign Up" %}</a>
+            </li>
+            {% endif %}
+            <li class="nav-item">
+              {# URL provided by django-allauth/account/urls.py #}
+              <a id="log-in-link" class="nav-link" href="{% url 'account_login' %}">{% translate "Sign In" %}</a>
+            </li>
             {% endif %}
           </ul>
         </div>
       </div>
     </nav>
   </div>
-  <div class="container">
+  <div class="container adt-main" id="adt-content">
     {% if messages %}
-      {% for message in messages %}
-        <div class="alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% endif %}">
-          {{ message }}
-          <button type="button"
-                  class="btn-close"
-                  data-bs-dismiss="alert"
-                  aria-label="Close"></button>
-        </div>
-      {% endfor %}
+    {% for message in messages %}
+    <div class="alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% endif %}"
+      style="--i: {{ forloop.counter0 }}" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
     {% endif %}
     {% block main %}
-      {% block content %}
-        <p>Use this document as a way to quick start any new project.</p>
-      {% endblock content %}
+    {% block content %}
+    <p>Use this document as a way to quick start any new project.</p>
+    {% endblock content %}
     {% endblock main %}
 
   </div>
+
+  {# Pied de page — additif, hors de tout bloc surchargé aujourd'hui. #}
+  <footer class="adt-footer">
+    <div class="adt-footer__inner">
+      <span class="adt-footer__mark">Atelier du Terroir</span>
+      <span class="adt-meta">Lomé — Togo</span>
+    </div>
+  </footer>
+
   {% endblock body %}
   <!-- /container -->
   {% block modal %}
   {% endblock modal %}
   {% block inline_javascript %}
-    {% comment %}
-    Script tags with only code, no src (defer by default). To run
-    with a "defer" so that you run inline code:
-    <script>
-      window.addEventListener('DOMContentLoaded', () => {
-        /* Run whatever you want */
-      });
-    </script>
-    {% endcomment %}
+  {% comment %}
+  Script tags with only code, no src (defer by default). To run
+  with a "defer" so that you run inline code:
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      /* Run whatever you want */
+    });
+  </script>
+  {% endcomment %}
+
+  {% comment %}
+  Amélioration progressive — aucune fonctionnalité n'en dépend.
+  Si un gabarit enfant surcharge ce bloc, il doit appeler
+  « block.super » pour conserver ce comportement.
+  {% endcomment %}
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      'use strict';
+
+      // Respecte le réglage système : aucune animation pilotée par script.
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* --- Ombre de la barre de navigation au défilement -------------- */
+      const nav = document.querySelector('.navbar');
+      if (nav) {
+        const syncNavState = () => {
+          nav.classList.toggle('adt-nav--scrolled', window.scrollY > 8);
+        };
+        syncNavState();
+        window.addEventListener('scroll', syncNavState, { passive: true });
+      }
+
+      /* --- Révélation au défilement ----------------------------------- */
+      // Les éléments portant `data-adt-reveal` sont masqués puis révélés
+      // à l'entrée dans le viewport. Sans IntersectionObserver ou en
+      // mouvement réduit, ils restent simplement visibles.
+      const targets = document.querySelectorAll('[data-adt-reveal]');
+      if (targets.length && !reduced && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries, obs) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('adt-rise');
+            obs.unobserve(entry.target);
+          });
+        }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
+
+        targets.forEach((el) => {
+          el.style.opacity = '0';
+          observer.observe(el);
+        });
+      }
+    });
+  </script>
   {% endblock inline_javascript %}
 </body>
+
 </html>
