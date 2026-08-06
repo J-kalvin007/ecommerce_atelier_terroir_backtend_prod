@@ -245,7 +245,7 @@ class AdminPackItemInputSerializer(serializers.Serializer):
 
 class AdminPackSerializer(serializers.ModelSerializer):
     """CRUD admin des packs."""
-    items = AdminPackItemSerializer(many=True, read_only=True)
+    items = PackItemSerializer(many=True, read_only=True)
     items_input = AdminPackItemInputSerializer(many=True, write_only=True, required=False, source="items")
 
     class Meta:
