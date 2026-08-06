@@ -236,19 +236,60 @@ class AdminBannerSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at")
 
 
-class AdminPackItemSerializer(serializers.ModelSerializer):
-    """Articles de pack pour l'administration."""
-    class Meta:
-        model = PackItem
-        fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at")
+class AdminPackItemInputSerializer(serializers.Serializer):
+    """Serializer d'entrée pour les articles d'un pack (écriture uniquement)."""
+    product_variant = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1, default=1)
+    is_active = serializers.BooleanField(default=True, required=False)
 
 
 class AdminPackSerializer(serializers.ModelSerializer):
     """CRUD admin des packs."""
     items = AdminPackItemSerializer(many=True, read_only=True)
+    items_input = AdminPackItemInputSerializer(many=True, write_only=True, required=False, source="items")
 
     class Meta:
         model = Pack
         fields = "__all__"
         read_only_fields = ("id", "created_at", "updated_at", "slug")
+
+    def create(self, validated_data):
+        from apps.catalog.models import ProductVariant
+        items_data = validated_data.pop("items", [])
+        pack = Pack.objects.create(**validated_data)
+        for item_data in items_data:
+            variant_id = item_data.get("product_variant")
+            try:
+                variant = ProductVariant.objects.get(pk=variant_id)
+                PackItem.objects.create(
+                    pack=pack,
+                    product_variant=variant,
+                    quantity=item_data.get("quantity", 1),
+                    is_active=item_data.get("is_active", True),
+                )
+            except ProductVariant.DoesNotExist:
+                pass
+        return pack
+
+    def update(self, instance, validated_data):
+        from apps.catalog.models import ProductVariant
+        items_data = validated_data.pop("items", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if items_data is not None:
+            instance.items.all().delete()
+            for item_data in items_data:
+                variant_id = item_data.get("product_variant")
+                try:
+                    variant = ProductVariant.objects.get(pk=variant_id)
+                    PackItem.objects.create(
+                        pack=instance,
+                        product_variant=variant,
+                        quantity=item_data.get("quantity", 1),
+                        is_active=item_data.get("is_active", True),
+                    )
+                except ProductVariant.DoesNotExist:
+                    pass
+        return instance
+
