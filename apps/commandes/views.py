@@ -46,13 +46,19 @@ class CheckoutAPIView(generics.GenericAPIView):
 
         user = request.user if request.user.is_authenticated else None
 
+        raw_items = serializer.validated_data.get("items", [])
+        items = [i for i in raw_items if i.get("product_id")]
+        packs = [i for i in raw_items if i.get("pack_id")]
+        # Au cas où ils envoient les packs dans le tableau `packs` dédié
+        packs.extend(serializer.validated_data.get("packs", []))
+
         order = OrderService.create_order(
             user=user,
             nom_client=serializer.validated_data.get("nom_client", ""),
             prenom_client=serializer.validated_data.get("prenom_client", ""),
             email_client=serializer.validated_data.get("email_client", ""),
-            items=serializer.validated_data.get("items", []),
-            packs=serializer.validated_data.get("packs", []),
+            items=items,
+            packs=packs,
             address_livraison=serializer.validated_data["address_livraison"],
             phone_livraison=serializer.validated_data["phone_livraison"],
             city=serializer.validated_data["city"],

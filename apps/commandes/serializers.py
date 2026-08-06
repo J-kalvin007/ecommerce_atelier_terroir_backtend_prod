@@ -10,8 +10,14 @@ from apps.catalog.serializers import ProductVariantSerializer
 # =====================================================
 
 class CheckoutItemSerializer(serializers.Serializer):
-    product_id = serializers.UUIDField()
+    product_id = serializers.UUIDField(required=False, allow_null=True)
+    pack_id = serializers.UUIDField(required=False, allow_null=True)
     quantity = serializers.IntegerField(min_value=1)
+
+    def validate(self, data):
+        if not data.get('product_id') and not data.get('pack_id'):
+            raise serializers.ValidationError("Vous devez fournir soit un product_id soit un pack_id.")
+        return data
 
 
 class CheckoutPackSerializer(serializers.Serializer):
