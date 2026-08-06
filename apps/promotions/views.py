@@ -247,7 +247,7 @@ class ActiveBannersView(APIView):
 
 class ActivePacksViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    GET /api/v1/promotions/packs/
+    GET /api/v1/promotions/packs-actifs/
     Liste des packs promotionnels actifs (public).
     """
     permission_classes = [AllowAny]

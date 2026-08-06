@@ -64,10 +64,10 @@ class DeliveryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_superuser or user.role == "platform_admin":
-            return Delivery.objects.all().select_related("order", "delivery_person")
+            return Delivery.objects.all().select_related("order", "delivery_person", "livreur")
         
         # Pour les clients : on filtre sur les livraisons liées à leurs commandes
-        return Delivery.objects.filter(order__user=user).select_related("order", "delivery_person")
+        return Delivery.objects.filter(order__user=user).select_related("order", "delivery_person", "livreur")
 
     @extend_schema(
         summary="Assigner un livreur",

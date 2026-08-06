@@ -18,7 +18,7 @@ from .views import (
 
 # Router public
 public_router = DefaultRouter()
-public_router.register(r"packs", ActivePacksViewSet, basename="active-packs")
+public_router.register(r"packs-actifs", ActivePacksViewSet, basename="active-packs")
 
 # Router admin
 admin_router = DefaultRouter()
