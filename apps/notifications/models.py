@@ -41,7 +41,7 @@ class CustomerReview(models.Model):
     profile_image = models.ImageField(_("Profile Image"), upload_to="reviews/profiles/", null=True, blank=True)
     rating = models.PositiveSmallIntegerField(_("Rating"), choices=[(i, i) for i in range(1, 6)])
     message = models.TextField(_("Message"))
-    is_approved = models.BooleanField(_("Approved"), default=True)
+    is_approved = models.BooleanField(_("Approved"), default=False)
     created_at = models.DateTimeField(_("Created at"), auto_now_add=True)
     
     class Meta:
