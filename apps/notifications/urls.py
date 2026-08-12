@@ -6,7 +6,8 @@ from .views import (
     NewsletterSubscriberDetailAPIView,
     ContactMessageListAPIView,
     ContactMessageDetailAPIView,
-    CustomerReviewListCreateAPIView,
+    CustomerReviewListAPIView,
+    CustomerReviewCreateAPIView,
     AdminCustomerReviewListAPIView,
     AdminCustomerReviewDetailAPIView,
 )
@@ -17,7 +18,8 @@ urlpatterns = [
     # Public routes
     path("newsletter/", NewsletterSubscribeAPIView.as_view(), name="newsletter-subscribe"),
     path("contact/", ContactMessageCreateAPIView.as_view(), name="contact-message"),
-    path("avis-clients/", CustomerReviewListCreateAPIView.as_view(), name="customer-reviews"),
+    path("avis-clients/", CustomerReviewListAPIView.as_view(), name="customer-reviews-list"),
+    path("avis-clients/create/", CustomerReviewCreateAPIView.as_view(), name="customer-reviews-create"),
 
     # Admin routes
     path("admin/newsletter/", NewsletterSubscriberListAPIView.as_view(), name="admin-newsletter-list"),

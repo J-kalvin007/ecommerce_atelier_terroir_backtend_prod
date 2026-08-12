@@ -173,16 +173,9 @@ class ContactMessageDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
             "Retourne la liste des avis clients qui ont été approuvés par l'administration. "
             "Accès public."
         )
-    ),
-    post=extend_schema(
-        summary="Soumettre un avis client",
-        description=(
-            "Permet à un utilisateur de soumettre un nouvel avis. "
-            "L'avis devra être approuvé par un administrateur avant d'être visible."
-        )
     )
 )
-class CustomerReviewListCreateAPIView(generics.ListCreateAPIView):
+class CustomerReviewListAPIView(generics.ListAPIView):
     serializer_class = CustomerReviewSerializer
     permission_classes = [] # Accessible to public
 
@@ -191,12 +184,31 @@ class CustomerReviewListCreateAPIView(generics.ListCreateAPIView):
 
 
 @extend_schema_view(
+    post=extend_schema(
+        summary="Soumettre un avis client",
+        description=(
+            "Permet à un utilisateur de soumettre un nouvel avis client sur la plateforme. "
+            "Les informations attendues incluent le nom, la ville, la note (1 à 5) et le message. "
+            "L'avis devra être approuvé par un administrateur (`is_approved=True`) avant de "
+            "devenir visible sur le point d'accès public de la page d'accueil."
+        ),
+        tags=["Avis Clients"]
+    )
+)
+class CustomerReviewCreateAPIView(generics.CreateAPIView):
+    serializer_class = CustomerReviewSerializer
+    permission_classes = [] # Accessible to public
+
+
+@extend_schema_view(
     get=extend_schema(
         summary="Lister tous les avis clients (Admin)",
         description=(
-            "Retourne la liste complète de tous les avis clients, approuvés ou non. "
-            "Accès réservé aux administrateurs de la plateforme."
-        )
+            "Retourne la liste complète et paginée de tous les avis clients, "
+            "qu'ils soient approuvés ou non. Utile pour la modération. "
+            "Accès strictement réservé aux administrateurs de la plateforme."
+        ),
+        tags=["Avis Clients (Admin)"]
     )
 )
 class AdminCustomerReviewListAPIView(generics.ListAPIView):
