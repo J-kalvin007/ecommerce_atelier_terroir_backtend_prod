@@ -277,6 +277,14 @@ class ActivePacksViewSet(viewsets.ReadOnlyModelViewSet):
 
 # ─── Admin ────────────────────────────────────────────────────────────────
 
+@extend_schema_view(
+    list=extend_schema(summary="Lister les codes promo (Admin)", description="Retourne la liste complète de tous les codes promotionnels. Accès réservé aux administrateurs de la plateforme."),
+    retrieve=extend_schema(summary="Détails d'un code promo (Admin)", description="Retourne les détails d'un code promotionnel spécifique par son ID."),
+    create=extend_schema(summary="Créer un code promo (Admin)", description="Permet de créer un nouveau code promotionnel."),
+    update=extend_schema(summary="Mettre à jour un code promo (Admin)", description="Met à jour l'intégralité d'un code promotionnel."),
+    partial_update=extend_schema(summary="Mettre à jour partiellement un code promo (Admin)", description="Met à jour partiellement les champs d'un code promotionnel."),
+    destroy=extend_schema(summary="Supprimer un code promo (Admin)", description="Supprime un code promotionnel de manière permanente.")
+)
 class AdminPromoCodeViewSet(viewsets.ModelViewSet):
     """
     CRUD admin pour les codes promo.
@@ -332,6 +340,14 @@ class AdminPromoCodeViewSet(viewsets.ModelViewSet):
 
 
 
+@extend_schema_view(
+    list=extend_schema(summary="Lister les ventes flash (Admin)", description="Retourne la liste de toutes les ventes flash/soldes. Accès réservé aux administrateurs de la plateforme."),
+    retrieve=extend_schema(summary="Détails d'une vente flash (Admin)", description="Retourne les détails d'une vente flash spécifique."),
+    create=extend_schema(summary="Créer une vente flash (Admin)", description="Permet de créer une nouvelle vente flash."),
+    update=extend_schema(summary="Mettre à jour une vente flash (Admin)", description="Met à jour l'intégralité d'une vente flash."),
+    partial_update=extend_schema(summary="Mettre à jour partiellement une vente flash (Admin)", description="Met à jour partiellement une vente flash."),
+    destroy=extend_schema(summary="Supprimer une vente flash (Admin)", description="Supprime une vente flash de manière permanente.")
+)
 class AdminFlashSaleViewSet(viewsets.ModelViewSet):
     """CRUD admin pour les ventes en solde."""
     queryset = Soldes.objects.all().order_by("-starts_at")
@@ -341,6 +357,14 @@ class AdminFlashSaleViewSet(viewsets.ModelViewSet):
 
 
 
+@extend_schema_view(
+    list=extend_schema(summary="Lister les bannières (Admin)", description="Retourne la liste de toutes les bannières publicitaires. Accès réservé aux administrateurs de la plateforme."),
+    retrieve=extend_schema(summary="Détails d'une bannière (Admin)", description="Retourne les détails d'une bannière spécifique."),
+    create=extend_schema(summary="Créer une bannière (Admin)", description="Permet de créer une nouvelle bannière."),
+    update=extend_schema(summary="Mettre à jour une bannière (Admin)", description="Met à jour l'intégralité d'une bannière."),
+    partial_update=extend_schema(summary="Mettre à jour partiellement une bannière (Admin)", description="Met à jour partiellement une bannière."),
+    destroy=extend_schema(summary="Supprimer une bannière (Admin)", description="Supprime une bannière de manière permanente.")
+)
 class AdminBannerViewSet(viewsets.ModelViewSet):
     """CRUD admin pour les bannières."""
     queryset = Banner.objects.all().order_by("banner_type", "position")
@@ -348,6 +372,14 @@ class AdminBannerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsPlatformAdmin]
 
 
+@extend_schema_view(
+    list=extend_schema(summary="Lister les packs promotionnels (Admin)", description="Retourne la liste de tous les packs promotionnels. Accès réservé aux administrateurs de la plateforme."),
+    retrieve=extend_schema(summary="Détails d'un pack promotionnel (Admin)", description="Retourne les détails d'un pack promotionnel spécifique via son slug."),
+    create=extend_schema(summary="Créer un pack promotionnel (Admin)", description="Permet de créer un nouveau pack promotionnel avec ses produits associés."),
+    update=extend_schema(summary="Mettre à jour un pack promotionnel (Admin)", description="Met à jour l'intégralité d'un pack promotionnel."),
+    partial_update=extend_schema(summary="Mettre à jour partiellement un pack promotionnel (Admin)", description="Met à jour partiellement un pack promotionnel."),
+    destroy=extend_schema(summary="Supprimer un pack promotionnel (Admin)", description="Supprime un pack promotionnel de manière permanente.")
+)
 class AdminPackViewSet(viewsets.ModelViewSet):
     """CRUD admin pour les packs promotionnels."""
     queryset = Pack.objects.all().order_by("-created_at")
