@@ -160,6 +160,14 @@ class Livreur(BaseModel):
         help_text="Adresse email du livreur (optionnel).",
     )
 
+    photo_profil = models.ImageField(
+        upload_to="livreurs/photos/",
+        blank=True,
+        null=True,
+        verbose_name="Photo de profil",
+        help_text="Photo de profil du livreur (optionnel, formats: JPG, PNG, WEBP).",
+    )
+
     type_vehicule = models.CharField(
         blank=True, null=True,
         max_length=20,
