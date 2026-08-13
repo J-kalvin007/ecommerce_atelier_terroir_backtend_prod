@@ -4,9 +4,12 @@ from django.core.mail import send_mail
 from django.conf import settings
 from .models import NewsletterSubscriber, ContactMessage, CustomerReview
 from .serializers import (
-    NewsletterSubscriberSerializer, 
+    NewsletterSubscriberSerializer,
+    AdminNewsletterSubscriberSerializer,
     ContactMessageSerializer, 
-    CustomerReviewSerializer
+    AdminContactMessageSerializer,
+    CustomerReviewSerializer,
+    AdminCustomerReviewSerializer
 )
 from apps.core.permissions import IsPlatformAdmin
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -107,7 +110,7 @@ class ContactMessageCreateAPIView(generics.CreateAPIView):
 )
 class NewsletterSubscriberListAPIView(generics.ListAPIView):
     queryset = NewsletterSubscriber.objects.all()
-    serializer_class = NewsletterSubscriberSerializer
+    serializer_class = AdminNewsletterSubscriberSerializer
     permission_classes = [IsPlatformAdmin]
 
 
@@ -116,14 +119,22 @@ class NewsletterSubscriberListAPIView(generics.ListAPIView):
         summary="Détails d'un abonné à la newsletter",
         description="Retourne les détails d'un abonné spécifique par son ID. Accès réservé aux administrateurs."
     ),
+    put=extend_schema(
+        summary="Mettre à jour un abonné",
+        description="Met à jour un abonné (ex: l'activer). Accès réservé aux administrateurs."
+    ),
+    patch=extend_schema(
+        summary="Mettre à jour partiellement un abonné",
+        description="Met à jour partiellement un abonné. Accès réservé aux administrateurs."
+    ),
     delete=extend_schema(
         summary="Supprimer un abonné à la newsletter",
         description="Supprime un abonné spécifique par son ID. Accès réservé aux administrateurs."
     )
 )
-class NewsletterSubscriberDetailAPIView(generics.RetrieveDestroyAPIView):
+class NewsletterSubscriberDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = NewsletterSubscriber.objects.all()
-    serializer_class = NewsletterSubscriberSerializer
+    serializer_class = AdminNewsletterSubscriberSerializer
     permission_classes = [IsPlatformAdmin]
 
 
@@ -138,7 +149,7 @@ class NewsletterSubscriberDetailAPIView(generics.RetrieveDestroyAPIView):
 )
 class ContactMessageListAPIView(generics.ListAPIView):
     queryset = ContactMessage.objects.all()
-    serializer_class = ContactMessageSerializer
+    serializer_class = AdminContactMessageSerializer
     permission_classes = [IsPlatformAdmin]
 
 
@@ -162,7 +173,7 @@ class ContactMessageListAPIView(generics.ListAPIView):
 )
 class ContactMessageDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ContactMessage.objects.all()
-    serializer_class = ContactMessageSerializer
+    serializer_class = AdminContactMessageSerializer
     permission_classes = [IsPlatformAdmin]
 
 
@@ -213,7 +224,7 @@ class CustomerReviewCreateAPIView(generics.CreateAPIView):
 )
 class AdminCustomerReviewListAPIView(generics.ListAPIView):
     queryset = CustomerReview.objects.all()
-    serializer_class = CustomerReviewSerializer
+    serializer_class = AdminCustomerReviewSerializer
     permission_classes = [IsPlatformAdmin]
 
 
@@ -237,5 +248,5 @@ class AdminCustomerReviewListAPIView(generics.ListAPIView):
 )
 class AdminCustomerReviewDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = CustomerReview.objects.all()
-    serializer_class = CustomerReviewSerializer
+    serializer_class = AdminCustomerReviewSerializer
     permission_classes = [IsPlatformAdmin]
