@@ -67,6 +67,7 @@ class LivreurSerializer(serializers.ModelSerializer):
             "nom",
             "prenom",
             "nom_complet",
+            "photo_profil",
             "telephone",
             "email",
             "type_vehicule",
@@ -98,6 +99,8 @@ class LivreurPublicSerializer(serializers.ModelSerializer):
             "id",
             "nom",
             "prenom",
+            "photo_profil",
+            "telephone",
             "nom_complet",
             "type_vehicule",
         ]
