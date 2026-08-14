@@ -77,7 +77,7 @@ class PackItemInline(admin.TabularInline):
 class PackAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "price", "is_active", "created_at")
     list_filter = ("is_active",)
-    search_fields = ("name", "slug", "description")
+    search_fields = ("name", "slug", "description", "recette")
     readonly_fields = ("created_at", "updated_at")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [PackItemInline]

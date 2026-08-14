@@ -453,6 +453,12 @@ class Pack(BaseModel):
         help_text="Identifiant URL du pack. Auto-généré depuis le nom si laissé vide.",
     )
     description = models.TextField(blank=True, null=True, verbose_name="Description")
+    recette = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Recette(s) conseillée(s)",
+        help_text="Liste des recettes ou plats possibles à faire facilement avec ce pack de produits."
+    )
     price = models.DecimalField(
         max_digits=12, 
         decimal_places=2,

@@ -189,6 +189,7 @@ class PackSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "description",
+            "recette",
             "price",
             "image_url",
             "is_active",
