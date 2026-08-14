@@ -260,6 +260,8 @@ class ProductVariant(BaseModel):
         Product,
         on_delete=models.CASCADE,
         related_name="variants",
+        null=True,
+        blank=True
     )
 
     name = models.CharField(
