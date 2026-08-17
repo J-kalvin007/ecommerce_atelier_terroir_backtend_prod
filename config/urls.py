@@ -109,6 +109,11 @@ urlpatterns = [
         include("apps.notifications.urls")
     ),
 
+    path(
+        "api/v1/recettes/",
+        include("apps.recettes.urls")
+    ),
+
     # ── Chatbot IA ──────────────────────────────────────────────────────────────
     path(
         "api/v1/chatbot/",

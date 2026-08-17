@@ -127,6 +127,7 @@ LOCAL_APPS = [
     "apps.fidelites",
     "apps.livraisons",
     "apps.notifications",
+    "apps.recettes",
     # ── Chatbot IA ─────────────────────────────────────────────────────────────
     "apps.chatbot",
 

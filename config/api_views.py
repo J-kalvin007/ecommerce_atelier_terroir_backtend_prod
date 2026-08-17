@@ -79,6 +79,12 @@ def api_v1_root(request, format=None):
         "admin-profiles": safe_reverse("admin-loyalty-profiles-list", request, format),
     }
 
+    # --- Recettes de cuisine ---
+    endpoints["recettes"] = {
+        "recettes": safe_reverse("recettes:recettes-list", request, format),
+        "admin-recettes": safe_reverse("recettes:admin-recettes-list", request, format),
+    }
+
     # Nettoyage des endpoints vides ou non-configurés
     clean_endpoints = {}
     for section, urls in endpoints.items():
