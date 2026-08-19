@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from django.utils.text import slugify
 
 
 logger = logging.getLogger(__name__)
@@ -191,6 +192,15 @@ class Recette(BaseModel):
         verbose_name="Nom de la recette",
     )
 
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Slug",
+    )
+
     description = models.TextField(
         null=True,
         blank=True,
@@ -294,7 +304,8 @@ class Recette(BaseModel):
 
     def save(self, *args, **kwargs):
         """
-        Compresse la vidéo côté serveur avant écriture, si un nouveau
+        Auto-génère un slug unique depuis le nom si non fourni, puis
+        compresse la vidéo côté serveur avant écriture si un nouveau
         fichier vient d'être assigné au champ `video`.
 
         `_committed` vaut False tant que le FieldFile n'a pas encore été
@@ -303,6 +314,22 @@ class Recette(BaseModel):
         stocké rechargé depuis la base lors d'une sauvegarde ne touchant pas
         la vidéo.
         """
+        if not self.slug and self.nom:
+            base_slug = slugify(self.nom)
+            slug = base_slug
+            counter = 1
+            # Garantit l'unicité en ajoutant un suffixe numérique si nécessaire
+            qs = Recette.objects.filter(slug=slug)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            while qs.exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+                qs = Recette.objects.filter(slug=slug)
+                if self.pk:
+                    qs = qs.exclude(pk=self.pk)
+            self.slug = slug
+
         if self.video and not self.video._committed:
             self.video = _compress_recette_video(self.video)
 

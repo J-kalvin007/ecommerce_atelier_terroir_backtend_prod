@@ -12,6 +12,11 @@ class RecetteFilter(FilterSet):
     par identifiant ou par slug.
     """
 
+    slug = CharFilter(
+        field_name="slug",
+        help_text="Slug de la recette.",
+    )
+
     product = CharFilter(
         field_name="product_id",
         help_text="Identifiant du produit dont on veut les recettes.",

@@ -10,6 +10,7 @@ class RecetteAdmin(admin.ModelAdmin):
     list_display = (
         "image_preview",
         "nom",
+        "slug",
         "product",
         "pack",
         "is_active",
@@ -23,6 +24,7 @@ class RecetteAdmin(admin.ModelAdmin):
 
     search_fields = (
         "nom",
+        "slug",
         "description",
         "ingredients",
         "product__name",
@@ -33,6 +35,10 @@ class RecetteAdmin(admin.ModelAdmin):
         "product",
         "pack",
     )
+
+    prepopulated_fields = {
+        "slug": ("nom",)
+    }
 
     readonly_fields = (
         "created_at",
@@ -46,6 +52,7 @@ class RecetteAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "nom",
+                    "slug",
                     "description",
                     "is_active",
                 )

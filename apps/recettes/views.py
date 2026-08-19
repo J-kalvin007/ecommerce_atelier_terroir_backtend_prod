@@ -32,7 +32,8 @@ from .services import RecetteService
             "Retourne les recettes de cuisine actives. Filtrable par produit "
             "(`?product=<id>` ou `?product_slug=<slug>`) ou par pack "
             "(`?pack=<id>` ou `?pack_slug=<slug>`) afin de récupérer les "
-            "recettes associées à un produit ou à un pack de produits particulier."
+            "recettes associées à un produit ou à un pack de produits particulier. "
+            "Filtrable également par le slug propre de la recette (`?slug=<slug>`)."
         ),
     ),
     retrieve=extend_schema(
@@ -59,6 +60,7 @@ class RecetteViewSet(ReadOnlyModelViewSet):
 
     search_fields = [
         "nom",
+        "slug",
         "description",
         "ingredients",
     ]
