@@ -99,6 +99,12 @@ class Product(BaseModel):
         blank=True,
     )
 
+    unite = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True
+    )
+
     seo_title = models.CharField(
         max_length=255,
         blank=True,
@@ -290,6 +296,12 @@ class ProductVariant(BaseModel):
     weight_grams = models.PositiveIntegerField(
         null=True,
         blank=True,
+    )
+
+    unite = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True
     )
 
     class Meta:

@@ -147,6 +147,7 @@ class PackItemVariantSerializer(serializers.ModelSerializer):
             "price",
             "stock",
             "weight_grams",
+            "unite",
             "is_active",
             "product_name",
             "product_slug",

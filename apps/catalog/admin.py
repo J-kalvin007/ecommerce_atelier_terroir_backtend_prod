@@ -41,6 +41,7 @@ class ProductVariantInline(admin.TabularInline):
         "price",
         "stock",
         "weight_grams",
+        "unite",
     )
 
 
@@ -93,6 +94,7 @@ class ProductAdmin(admin.ModelAdmin):
         "category",
         "price",
         "stock",
+        "unite",
         "product_type",
         "is_top",
         "created_at",
@@ -154,6 +156,7 @@ class ProductAdmin(admin.ModelAdmin):
                     "price",
                     "stock",
                     "weight_grams",
+                    "unite",
                 )
             },
         ),
@@ -307,6 +310,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
         "sku",
         "price",
         "stock",
+        "unite",
     )
 
     search_fields = (

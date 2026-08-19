@@ -130,34 +130,60 @@ def update_rating_on_delete(sender, instance, **kwargs):
 @receiver(post_save, sender=Product)
 def sync_default_variant_for_product(sender, instance, created, **kwargs):
     """
-    Crée automatiquement une variante par défaut contenant les mêmes données
-    que le produit principal lors de sa création.
-    Maintient également le stock de la variante par défaut synchronisé avec le produit.
+    Crée automatiquement une variante par défaut identique au produit principal
+    lors de sa création, et la maintient parfaitement synchronisée (copie
+    conforme) à chaque modification du produit : nom, sku, prix, stock,
+    poids et unité.
+
+    Utilise systématiquement un queryset.update() (et non instance.save())
+    pour ne pas redéclencher inutilement le signal post_save de ProductVariant
+    et éviter toute boucle de rappel entre les deux signaux.
     """
     from apps.catalog.models import ProductVariant
     from django.utils import timezone
-    
+
     stock_value = instance.stock if instance.stock is not None else 0
+    name_value = instance.name[:100]  # limité à 100 char max comme défini dans le modèle
 
     if created:
         ProductVariant.objects.create(
             product=instance,
-            name=instance.name[:100],  # limité à 100 char max comme défini dans le modèle
+            name=name_value,
             sku=instance.sku,
             price=instance.price,
             stock=stock_value,
             weight_grams=instance.weight_grams,
+            unite=instance.unite,
+            is_active=instance.is_active,
         )
         logger.info(f"Variante par défaut créée pour le produit {instance.sku}")
     else:
-        # Met à jour le stock de la variante par défaut (la plus ancienne)
+        # Resynchronise la variante par défaut (la plus ancienne) avec le produit
         default_variant = ProductVariant.objects.filter(product=instance).order_by('created_at').first()
-        if default_variant and default_variant.stock != stock_value:
-            ProductVariant.objects.filter(id=default_variant.id).update(
-                stock=stock_value,
-                updated_at=timezone.now()
+
+        if default_variant:
+            changed = (
+                default_variant.name != name_value
+                or default_variant.sku != instance.sku
+                or default_variant.price != instance.price
+                or default_variant.stock != stock_value
+                or default_variant.weight_grams != instance.weight_grams
+                or default_variant.unite != instance.unite
+                or default_variant.is_active != instance.is_active
             )
-            logger.info(f"Stock de la variante par défaut mis à jour pour le produit {instance.sku}")
+
+            if changed:
+                ProductVariant.objects.filter(id=default_variant.id).update(
+                    name=name_value,
+                    sku=instance.sku,
+                    price=instance.price,
+                    stock=stock_value,
+                    weight_grams=instance.weight_grams,
+                    unite=instance.unite,
+                    is_active=instance.is_active,
+                    updated_at=timezone.now()
+                )
+                logger.info(f"Variante par défaut resynchronisée avec le produit {instance.sku}")
 
 from apps.catalog.models import ProductVariant
 

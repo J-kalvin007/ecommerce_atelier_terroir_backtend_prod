@@ -36,6 +36,10 @@ class ProductFilter(FilterSet):
         field_name="sku",
     )
 
+    unite = CharFilter(
+        field_name="unite",
+    )
+
     is_top = BooleanFilter(
         field_name="is_top",
     )
