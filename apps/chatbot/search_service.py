@@ -51,6 +51,23 @@ INTENT_KEYWORDS: dict[str, list[str]] = {
         "code", "remise", "cadeau", "offert", "gratuit", "bon plan", "deal",
         "moins cher", "rabais", "avantage", "flash", "bannière",
     ],
+    "packs": [
+        "pack", "packs", "lot", "coffret", "panier garni", "assortiment",
+        "bundle", "ensemble", "kit", "box", "combo", "formule", "sélection",
+        "selection", "pack promotionnel", "pack produit", "offre group",
+    ],
+    "recettes": [
+        "recette", "recettes", "cuisine", "cuisiner", "préparation", "preparation",
+        "plat", "plats", "ingrédient", "ingredient", "plat traditionnel",
+        "comment faire", "plat africain", "plat togolais", "sauce",
+        "plat maison", "plat cuisiné", "instruction", "étape", "etape",
+        "plat du terroir", "idée repas", "idee repas", "menu", "plat local",
+    ],
+    "livreurs": [
+        "livreur", "livreurs", "coursier", "chauffeur", "transporteur",
+        "qui livre", "équipe de livraison", "equipe de livraison",
+        "personnel de livraison", "flotte", "véhicule", "vehicule", "moto",
+    ],
     "orders": [
         "commande", "achat", "commander", "acheté", "order", "panier", "cart",
         "statut", "expédié", "annulé", "remboursé", "référence", "réf", "item", "article commandé",
@@ -199,6 +216,18 @@ class AISearchService:
             elif intent == "promos":
                 raw_data["promos"] = self._query_promos()
 
+            elif intent == "packs":
+                raw_data["packs"] = self._query_packs()
+
+            elif intent == "recettes":
+                raw_data["recettes"] = self._query_recettes()
+
+            # Les fiches livreurs portent des données personnelles (téléphone,
+            # e-mail, zone d'affectation) : réservées à l'administrateur. Un
+            # client obtient une réponse générique via l'intention "deliveries".
+            elif intent == "livreurs" and self.role == ROLE_ADMIN:
+                raw_data["livreurs"] = self._query_livreurs()
+
             elif intent == "orders" and self.role != ROLE_ANONYMOUS:
                 raw_data["orders"] = self._query_orders()
 
@@ -281,6 +310,146 @@ class AISearchService:
                 "description": c.description or "",
             }
             for c in codes
+        ]
+
+    def _query_packs(self) -> list[dict]:
+        """
+        Packs promotionnels actifs correspondant à la requête.
+
+        Un pack regroupe plusieurs variantes de produits à un prix fixe. La
+        composition est résolue via `items` afin que l'assistant puisse dire
+        ce que le pack contient réellement, et non seulement son prix.
+        """
+        from apps.promotions.models import Pack
+
+        words = self.query.split()
+        q_filter = Q()
+        for word in words:
+            q_filter |= (
+                Q(name__icontains=word)
+                | Q(description__icontains=word)
+                | Q(recette__icontains=word)
+            )
+
+        qs = (
+            Pack.objects
+            .filter(is_active=True)
+            .prefetch_related("items__product_variant__product")
+        )
+        # Un mot-clé générique ("pack", "coffret") ne doit pas vider la liste :
+        # on ne restreint que si la requête matche réellement quelque chose.
+        if words and qs.filter(q_filter).exists():
+            qs = qs.filter(q_filter)
+
+        packs = qs.order_by("-created_at")[:6]
+
+        result = []
+        for p in packs:
+            composition = [
+                f"{item.quantity or 1} x {item.product_variant.name}"
+                for item in p.items.all()[:8]
+            ]
+            result.append({
+                "name": p.name,
+                "slug": p.slug,
+                "price": str(p.price),
+                "description": p.description or "",
+                "recettes_conseillees": p.recette or "",
+                "composition": composition,
+                "nb_articles": len(composition),
+                "image": p.image.url if p.image else None,
+                "url": f"/packs/{p.slug}",
+            })
+        return result
+
+    def _query_recettes(self) -> list[dict]:
+        """
+        Recettes de cuisine actives correspondant à la requête.
+
+        Recherche sur le nom, la description, les ingrédients et les
+        instructions — un utilisateur cherche souvent une recette par un
+        ingrédient ("recette avec du gombo") plutôt que par son titre.
+        """
+        from apps.recettes.models import Recette
+
+        words = self.query.split()
+        q_filter = Q()
+        for word in words:
+            q_filter |= (
+                Q(nom__icontains=word)
+                | Q(description__icontains=word)
+                | Q(ingredients__icontains=word)
+                | Q(instructions__icontains=word)
+            )
+
+        qs = (
+            Recette.objects
+            .filter(is_active=True)
+            .select_related("product", "pack")
+        )
+        if words and qs.filter(q_filter).exists():
+            qs = qs.filter(q_filter)
+
+        recettes = qs.order_by("-created_at")[:6]
+
+        result = []
+        for r in recettes:
+            # `ingredients` et `instructions` sont saisis une entrée par ligne.
+            ingredients = [ln.strip() for ln in (r.ingredients or "").splitlines() if ln.strip()]
+            etapes = [ln.strip() for ln in (r.instructions or "").splitlines() if ln.strip()]
+            result.append({
+                "nom": r.nom,
+                "slug": r.slug,
+                "description": r.description or "",
+                "ingredients": ingredients[:12],
+                "nb_etapes": len(etapes),
+                "etapes": etapes[:8],
+                "a_une_video": bool(r.video or r.video_url),
+                "image": r.image_1.url if r.image_1 else (r.image_2.url if r.image_2 else None),
+                "produit_associe": r.product.name if r.product else None,
+                "pack_associe": r.pack.name if r.pack else None,
+                "url": f"/recettes/{r.slug}",
+            })
+        return result
+
+    def _query_livreurs(self) -> list[dict]:
+        """
+        Fiches livreurs — ADMINISTRATEUR UNIQUEMENT.
+
+        Contient des données personnelles (téléphone, e-mail). L'appel est
+        déjà filtré par rôle dans `search()`, cette garde est une seconde
+        barrière au cas où la méthode serait appelée ailleurs.
+        """
+        if self.role != ROLE_ADMIN:
+            return []
+
+        from apps.livraisons.models import Livreur
+
+        words = self.query.split()
+        q_filter = Q()
+        for word in words:
+            q_filter |= (
+                Q(nom__icontains=word)
+                | Q(prenom__icontains=word)
+                | Q(zone_livraison__icontains=word)
+                | Q(type_vehicule__icontains=word)
+            )
+
+        qs = Livreur.objects.filter(is_active=True)
+        if words and qs.filter(q_filter).exists():
+            qs = qs.filter(q_filter)
+
+        livreurs = qs.order_by("nom")[:10]
+
+        return [
+            {
+                "nom_complet": l.nom_complet,
+                "telephone": l.telephone or "—",
+                "email": l.email or "—",
+                "vehicule": l.get_type_vehicule_display() if l.type_vehicule else "—",
+                "zone": l.zone_livraison or "Non affectée",
+            }
+            for l in livreurs
         ]
 
     def _query_notifications(self) -> dict:
@@ -668,6 +837,8 @@ Consignes de réponse :
   spéciaux rendraient ta déduction incorrecte et le lien casserait).
 - Ne mets JAMAIS de lien textuel brut, utilise STRICTEMENT les tags UI suivants pour que l'interface génère de magnifiques cartes interactives :
   - Produit : [PRODUCT:nom:prix:slug:image] (ex: [PRODUCT:Miel:5000:miel:/media/products/miel.jpg]). Si `primary_image` est `null`/absent dans les données, écris "null" à la place : [PRODUCT:Miel:5000:miel:null].
+  - Pack : [PACK:nom:prix:slug:image] (ex: [PACK:Panier Découverte:15000:panier-decouverte:/media/packs/panier.jpg]). Même règle "null" pour l'image.
+  - Recette : [RECETTE:nom:slug:image] (ex: [RECETTE:Sauce gombo:sauce-gombo:/media/recettes/gombo.jpg]). Même règle "null" pour l'image.
   - Commande : [ORDER:reference:statut:montant:date] (ex: [ORDER:ATT-1234:pending:25000:08/07/2026])
   - Wallet (Solde) : [WALLET:solde] (ex: [WALLET:2500])
   - Fidélité (Points) : [LOYALTY:points:nom_du_grade] (ex: [LOYALTY:150:Gold])
@@ -712,6 +883,26 @@ Consignes de réponse :
                     lines.append(f"[PRODUCT:{p.get('name')}:{p.get('price')}:{p.get('slug')}:{image}]")
             else:
                 lines.append("📦 Aucun produit trouvé.")
+
+        if "packs" in raw_data:
+            packs = raw_data["packs"]
+            if packs:
+                lines.append(f"\n🎁 **{len(packs)} pack(s) trouvé(s) :**")
+                for p in packs:
+                    image = p.get("image") or "null"
+                    lines.append(f"[PACK:{p.get('name')}:{p.get('price')}:{p.get('slug')}:{image}]")
+            else:
+                lines.append("\n🎁 Aucun pack trouvé.")
+
+        if "recettes" in raw_data:
+            recettes = raw_data["recettes"]
+            if recettes:
+                lines.append(f"\n👩‍🍳 **{len(recettes)} recette(s) trouvée(s) :**")
+                for r in recettes:
+                    image = r.get("image") or "null"
+                    lines.append(f"[RECETTE:{r.get('nom')}:{r.get('slug')}:{image}]")
+            else:
+                lines.append("\n👩‍🍳 Aucune recette trouvée.")
 
         if "orders" in raw_data:
             orders = raw_data["orders"]

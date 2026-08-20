@@ -296,6 +296,10 @@ une épicerie fine en ligne spécialisée dans les produits alimentaires du terr
 
 Ton rôle est d'aider les clients avec :
 - La recherche et la découverte de produits (fruits, légumes, huiles, feuilles, tubercules...)
+- Les PACKS promotionnels : lots de plusieurs produits vendus ensemble à prix fixe avantageux
+  (coffret, panier garni, assortiment, kit, box) — via la fonction `search_packs`
+- Les RECETTES de cuisine publiées par la boutique (ingrédients, étapes, vidéo), y compris
+  « quelle recette faire avec tel ingrédient ? » — via la fonction `search_recettes`
 - Les informations sur les catégories de produits disponibles
 - Le suivi de leurs commandes et l'état des livraisons
 - La consultation de leur solde de porte-monnaie (wallet)
@@ -335,6 +339,8 @@ RÈGLES ABSOLUES ET NON NÉGOCIABLES (INTERDICTION DE DÉROGER)
    - N'ajoute JAMAIS de backticks (`), de guillemets ou de code blocks autour des tags.
    - N'ajoute AUCUN texte supplémentaire sur la même ligne (pas de prix initial, de remise ou de date de validité à côté). Juste le tag nu.
    - Produit : `[PRODUCT:nom_du_produit:prix:slug:image_url]` (Exemple correct : [PRODUCT:Gombo:600:gombo:/media/products/gombo.jpg])
+   - Pack : `[PACK:nom_du_pack:prix:slug:image_url]` (Exemple correct : [PACK:Panier Découverte:15000:panier-decouverte:/media/packs/panier.jpg])
+   - Recette : `[RECETTE:nom_de_la_recette:slug:image_url]` (Exemple correct : [RECETTE:Sauce gombo:sauce-gombo:/media/recettes/gombo.jpg])
    - Commande : `[ORDER:reference:statut:montant:date]` (Exemple correct : [ORDER:ATT-1234:pending:25000:08/07/2026])
    - Wallet (Solde) : `[WALLET:solde]` (Exemple correct : [WALLET:2500])
    - Fidélité (Points) : `[LOYALTY:points:nom_du_grade]` (Exemple correct : [LOYALTY:150:Gold])
@@ -409,6 +415,8 @@ RÈGLES DE COMMUNICATION
         """
         FUNCTION_ROUTER = {
             "search_products": self._api_search_products,
+            "search_packs": self._api_search_packs,
+            "search_recettes": self._api_search_recettes,
             "get_categories": self._api_get_categories,
             "get_active_promo_codes": self._api_get_active_promo_codes,
             "get_my_orders": self._api_get_my_orders,
@@ -515,6 +523,127 @@ RÈGLES DE COMMUNICATION
             })
 
         return json.dumps({"found": len(results), "products": results}, ensure_ascii=False)
+
+    def _api_search_packs(self, args: dict) -> str:
+        """
+        Recherche les packs promotionnels actifs (lots de produits à prix fixe).
+
+        Args:
+            args: Peut contenir 'query' (str, optionnel). Vide = tous les packs.
+
+        Returns:
+            JSON avec la liste des packs et leur composition.
+        """
+        from apps.promotions.models import Pack
+        from django.db.models import Q
+
+        query = args.get("query", "").strip()
+
+        qs = Pack.objects.filter(is_active=True).prefetch_related(
+            "items__product_variant__product"
+        )
+
+        if query:
+            q_filter = Q()
+            for word in query.split():
+                q_filter |= (
+                    Q(name__icontains=word)
+                    | Q(description__icontains=word)
+                    | Q(recette__icontains=word)
+                )
+            # Une requête trop précise ne doit pas masquer le catalogue de packs :
+            # si elle ne matche rien, on retombe sur la liste complète plutôt que
+            # de laisser le LLM face à un résultat vide (source d'invention).
+            if qs.filter(q_filter).exists():
+                qs = qs.filter(q_filter)
+
+        packs = qs.order_by("-created_at")[:5]
+
+        if not packs:
+            return json.dumps({
+                "found": 0,
+                "message": "Aucun pack promotionnel n'est disponible pour le moment.",
+            }, ensure_ascii=False)
+
+        results = []
+        for p in packs:
+            composition = [
+                f"{item.quantity or 1} x {item.product_variant.name}"
+                for item in p.items.all()[:8]
+            ]
+            results.append({
+                "name": p.name,
+                "slug": p.slug,
+                "price_fcfa": f"{p.price} FCFA",
+                "description": p.description or "",
+                "recettes_conseillees": p.recette or "",
+                "composition": composition,
+                "image": p.image.url if p.image else None,
+                "url": f"/packs/{p.slug}",
+            })
+
+        return json.dumps({"found": len(results), "packs": results}, ensure_ascii=False)
+
+    def _api_search_recettes(self, args: dict) -> str:
+        """
+        Recherche les recettes de cuisine publiées.
+
+        La recherche porte aussi sur les ingrédients : un utilisateur demande
+        souvent « une recette avec du gombo » plutôt que le titre exact.
+
+        Args:
+            args: Peut contenir 'query' (str, optionnel).
+
+        Returns:
+            JSON avec la liste des recettes trouvées.
+        """
+        from apps.recettes.models import Recette
+        from django.db.models import Q
+
+        query = args.get("query", "").strip()
+
+        qs = Recette.objects.filter(is_active=True).select_related("product", "pack")
+
+        if query:
+            q_filter = Q()
+            for word in query.split():
+                q_filter |= (
+                    Q(nom__icontains=word)
+                    | Q(description__icontains=word)
+                    | Q(ingredients__icontains=word)
+                    | Q(instructions__icontains=word)
+                )
+            if qs.filter(q_filter).exists():
+                qs = qs.filter(q_filter)
+
+        recettes = qs.order_by("-created_at")[:5]
+
+        if not recettes:
+            return json.dumps({
+                "found": 0,
+                "message": "Aucune recette n'est disponible pour le moment.",
+            }, ensure_ascii=False)
+
+        results = []
+        for r in recettes:
+            # `ingredients` et `instructions` sont saisis une entrée par ligne.
+            ingredients = [ln.strip() for ln in (r.ingredients or "").splitlines() if ln.strip()]
+            etapes = [ln.strip() for ln in (r.instructions or "").splitlines() if ln.strip()]
+            results.append({
+                "nom": r.nom,
+                "slug": r.slug,
+                "description": r.description or "",
+                "ingredients": ingredients[:12],
+                "etapes": etapes[:8],
+                "nb_etapes": len(etapes),
+                "a_une_video": bool(r.video or r.video_url),
+                "image": r.image_1.url if r.image_1 else (r.image_2.url if r.image_2 else None),
+                "produit_associe": r.product.name if r.product else None,
+                "pack_associe": r.pack.name if r.pack else None,
+                "url": f"/recettes/{r.slug}",
+            })
+
+        return json.dumps({"found": len(results), "recettes": results}, ensure_ascii=False)
 
     def _api_get_categories(self, args: dict) -> str:
         """

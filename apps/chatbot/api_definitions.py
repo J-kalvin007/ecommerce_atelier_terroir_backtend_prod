@@ -143,4 +143,54 @@ API_FUNCTIONS: list[dict] = [
             "properties": {},
         },
     },
+
+    {
+        "name": "search_packs",
+        "description": (
+            "Recherche les packs promotionnels de la boutique. Un pack regroupe plusieurs produits "
+            "vendus ensemble à un prix fixe avantageux (coffret, lot, panier garni, assortiment, kit). "
+            "Retourne le nom, le prix, la composition détaillée et le slug de chaque pack. "
+            "Utilise cette fonction dès que l'utilisateur parle de pack, coffret, lot, panier garni, "
+            "assortiment, box ou d'une offre groupée."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Mots-clés de recherche du pack. Laisse vide pour lister tous les packs "
+                        "disponibles."
+                    ),
+                },
+            },
+        },
+    },
+
+    # ----------------------------------------------------------
+    # RECETTES — Endpoints publics
+    # ----------------------------------------------------------
+
+    {
+        "name": "search_recettes",
+        "description": (
+            "Recherche les recettes de cuisine publiées par la boutique. Chaque recette contient "
+            "des ingrédients, des étapes de préparation et parfois une vidéo, et peut être rattachée "
+            "à un produit ou à un pack. Utilise cette fonction dès que l'utilisateur cherche une "
+            "recette, demande comment cuisiner ou préparer un plat, cherche une idée de repas, "
+            "ou demande quoi faire avec un ingrédient précis."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Mots-clés : nom du plat, ou ingrédient recherché (ex: 'gombo', 'sauce "
+                        "arachide'). Laisse vide pour lister les dernières recettes publiées."
+                    ),
+                },
+            },
+        },
+    },
 ]
