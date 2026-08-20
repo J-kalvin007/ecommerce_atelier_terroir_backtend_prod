@@ -114,7 +114,12 @@ class ChatService:
                 messages=messages_for_llm,
                 tools=[{"type": "function", "function": fn} for fn in API_FUNCTIONS],
                 tool_choice="auto",
-                temperature=0.7,
+                # Température abaissée (0.7 → 0.3) : ce premier appel décide QUAND
+                # appeler une fonction et avec quels arguments — une température
+                # élevée le rendait plus susceptible de répondre directement
+                # (sans vérifier les données réelles) sur la base de ce qu'il
+                # "croit" savoir du catalogue, au lieu d'appeler `search_products`.
+                temperature=0.3,
                 max_tokens=1000,
             )
         except openai.OpenAIError as exc:
@@ -157,7 +162,10 @@ class ChatService:
                 final_response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages_for_llm,
-                    temperature=0.7,
+                    # Idem : reformule les résultats réels de la fonction en
+                    # langage naturel — une température basse limite le risque
+                    # qu'il "enjolive" ou ajoute des détails absents des données.
+                    temperature=0.3,
                     max_tokens=1000,
                 )
                 final_text = final_response.choices[0].message.content or ""
@@ -337,6 +345,24 @@ RÈGLES ABSOLUES ET NON NÉGOCIABLES (INTERDICTION DE DÉROGER)
    - Si l'utilisateur pose une question hors sujet, réponds poliment que tu es dédié à L'Atelier du Terroir uniquement.
    - Lors de la présentation d'un produit, utilise sa description complète pour mettre en valeur ses caractéristiques clés (ex: goût, bienfaits, conseils d'utilisation) sans être trop verbeux. Sois précis et attractif.
 
+5. INTERDICTION ABSOLUE D'INVENTER (ANTI-HALLUCINATION) :
+   ⛔ Tu ne dois JAMAIS mentionner, décrire ou mettre en tag [PRODUCT:...] un
+      produit, un prix, un stock ou un slug que tu n'as pas obtenu via un
+      appel à `search_products`. Ne réponds JAMAIS de mémoire ou par
+      supposition sur le catalogue — tu ne le connais pas, seule la fonction
+      `search_products` le connaît.
+   ⛔ Si l'utilisateur demande un produit et que tu n'as pas encore appelé
+      `search_products` pour cette demande précise, appelle la fonction
+      D'ABORD. Ne réponds jamais avant d'avoir les données réelles.
+   ⛔ Si `search_products` renvoie `"found": 0` (ou une liste vide), dis-le
+      HONNÊTEMENT à l'utilisateur (« Je n'ai trouvé aucun produit
+      correspondant à... ») et propose des alternatives ou une reformulation.
+      N'invente JAMAIS un produit plausible pour éviter de décevoir.
+   ⛔ Pour le champ `slug` d'un tag [PRODUCT:...], utilise EXACTEMENT la
+      valeur `slug` renvoyée par `search_products` — ne le déduis jamais
+      toi-même à partir du nom du produit (les accents et caractères
+      spéciaux te feraient produire un lien cassé).
+
 ═══════════════════════════════════════════════════════════
 RÈGLES DE COMMUNICATION
 ═══════════════════════════════════════════════════════════
@@ -424,6 +450,7 @@ RÈGLES DE COMMUNICATION
             JSON avec la liste des produits trouvés.
         """
         from apps.catalog.models import Product
+        from django.db.models import Q
 
         query = args.get("query", "").strip()
         category_filter = args.get("category", "").strip()
@@ -431,10 +458,26 @@ RÈGLES DE COMMUNICATION
         if not query:
             return json.dumps({"error": "Le terme de recherche est vide."})
 
+        # Recherche multi-champs (nom, description, catégorie, SKU) plutôt que
+        # sur le seul nom : un terme comme "petit-déjeuner" ou "grillade" ne
+        # matche presque jamais un nom de produit mais souvent sa description
+        # ou sa catégorie. Une recherche trop étroite qui ne renvoie rien pousse
+        # le LLM à improviser une réponse au lieu de dire honnêtement qu'il n'a
+        # rien trouvé — voir la règle anti-hallucination du prompt système.
+        words = query.split()
+        q_filter = Q()
+        for word in words:
+            q_filter |= (
+                Q(name__icontains=word)
+                | Q(description__icontains=word)
+                | Q(category__name__icontains=word)
+                | Q(sku__icontains=word)
+            )
+
         # Construction du queryset de base
         qs = Product.objects.filter(
+            q_filter,
             is_active=True,
-            name__icontains=query,
         ).select_related("category").prefetch_related("images")
 
         # Filtre optionnel par catégorie

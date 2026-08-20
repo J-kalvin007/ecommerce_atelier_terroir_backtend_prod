@@ -344,7 +344,7 @@ class AISearchService:
         only_favorites = any(kw in _normalize(query) for kw in ["favori"])
         only_rated = any(kw in _normalize(query) for kw in ["note", "avis", "mieux note", "bien note"])
 
-        qs = Product.objects.filter(is_active=True).select_related("category")
+        qs = Product.objects.filter(is_active=True).select_related("category").prefetch_related("images")
 
         if only_top:
             qs = qs.filter(is_top=True).order_by("-order_count", "-note_produit")
@@ -396,6 +396,8 @@ class AISearchService:
         result = []
         for p in products:
             sale_info = active_sales.get(str(p.id))
+            primary_image = p.images.filter(is_primary=True).first()
+            image_url = primary_image.image.url if primary_image and primary_image.image else None
             item = {
                 "id": str(p.id),
                 "name": p.name,
@@ -408,6 +410,10 @@ class AISearchService:
                 "count_ratings": p.count_ratings,
                 "count_favorites": p.count_favorites,
                 "order_count": p.order_count,
+                # `slug` explicite : le tag [PRODUCT:...] en a besoin tel quel — le
+                # LLM ne doit jamais avoir à le déduire de `url` par lui-même.
+                "slug": p.slug,
+                "primary_image": image_url,
                 "url": f"/products/{p.slug}",
             }
             if sale_info:
@@ -652,8 +658,16 @@ Voici les données récupérées depuis la base de données :
 
 Consignes de réponse :
 - Réponds en français, de manière chaleureuse, claire et précise.
+- ⛔ INTERDICTION ABSOLUE D'INVENTER : ne mentionne, ne cite et ne mets JAMAIS en
+  tag un produit, une commande, un montant ou un slug qui n'apparaît PAS mot
+  pour mot dans les données JSON ci-dessus. Si les données sont vides ou ne
+  contiennent aucun résultat pertinent, dis-le clairement (« Je n'ai trouvé
+  aucun produit correspondant... ») plutôt que de proposer un exemple plausible.
+- Pour un produit, utilise EXACTEMENT le champ `slug` fourni dans les données —
+  ne le déduis JAMAIS toi-même à partir du nom (les accents et caractères
+  spéciaux rendraient ta déduction incorrecte et le lien casserait).
 - Ne mets JAMAIS de lien textuel brut, utilise STRICTEMENT les tags UI suivants pour que l'interface génère de magnifiques cartes interactives :
-  - Produit : [PRODUCT:nom:prix:slug] (ex: [PRODUCT:Miel:5000:miel])
+  - Produit : [PRODUCT:nom:prix:slug:image] (ex: [PRODUCT:Miel:5000:miel:/media/products/miel.jpg]). Si `primary_image` est `null`/absent dans les données, écris "null" à la place : [PRODUCT:Miel:5000:miel:null].
   - Commande : [ORDER:reference:statut:montant:date] (ex: [ORDER:ATT-1234:pending:25000:08/07/2026])
   - Wallet (Solde) : [WALLET:solde] (ex: [WALLET:2500])
   - Fidélité (Points) : [LOYALTY:points:nom_du_grade] (ex: [LOYALTY:150:Gold])
@@ -670,7 +684,11 @@ Consignes de réponse :
                     {"role": "system", "content": "Tu es un assistant commercial IA expert de L'Atelier du Terroir."},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.6,
+                # Abaissée (0.6 → 0.3), même raison que ChatService : cet appel ne
+                # fait que reformuler des données ORM déjà réelles — une
+                # température plus basse limite le risque d'enjolivement/ajout
+                # de détails absents des données fournies.
+                temperature=0.3,
                 max_tokens=1500,
             )
             return response.choices[0].message.content or "Je n'ai pas pu formuler une réponse."
@@ -690,7 +708,8 @@ Consignes de réponse :
             if products:
                 lines.append(f"📦 **{len(products)} produit(s) trouvé(s) :**")
                 for p in products:
-                    lines.append(f"[PRODUCT:{p.get('name')}:{p.get('price')}:{p.get('slug')}]")
+                    image = p.get("primary_image") or "null"
+                    lines.append(f"[PRODUCT:{p.get('name')}:{p.get('price')}:{p.get('slug')}:{image}]")
             else:
                 lines.append("📦 Aucun produit trouvé.")
 

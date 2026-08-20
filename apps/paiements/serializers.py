@@ -198,7 +198,7 @@ class MyTransferSerializer(serializers.ModelSerializer):
         return STATUS.get(obj.status, {"label": obj.get_status_display(), "color": "#999"})
 
     def get_order_reference(self, obj):
-        return obj.order.reference if obj.order else None
+        return obj.order.numero_commande  if obj.order else None
 
     def get_provider_label(self, obj):
         PROVIDERS = {
