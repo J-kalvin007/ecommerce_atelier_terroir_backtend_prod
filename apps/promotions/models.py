@@ -182,57 +182,62 @@ class PromoCode(BaseModel):
         return PromoUsage.objects.filter(promo_code=self, user=user).count()
 
 
-# class PromoUsage(BaseModel):
-#     """
-#     Traçabilité d'utilisation d'un code promo.
+class PromoUsage(BaseModel):
+    """
+    Traçabilité d'utilisation d'un code promo.
 
-#     La contrainte unique_together (promo_code, user, order_id) garantit
-#     qu'un code ne peut être utilisé qu'une fois par utilisateur et par commande,
-#     même en cas de requêtes concurrentes.
-#     """
-#     promo_code = models.ForeignKey(
-#         PromoCode,
-#         on_delete=models.PROTECT,
-#         related_name="usages",
-#     )
+    La contrainte unique_together (promo_code, user, order) garantit
+    qu'un code ne peut être utilisé qu'une fois par utilisateur et par commande,
+    même en cas de requêtes concurrentes.
 
-#     user = models.ForeignKey(
-#         settings.AUTH_USER_MODEL,
-#         on_delete=models.PROTECT,
-#         related_name="promo_usages",
-#     )
+    Cette table avait été supprimée par la migration 0003_delete_promousage sans
+    remplacement : PromoService.validate_code ne vérifiait plus aucun quota et
+    PromoCode.get_user_usage_count référençait un modèle inexistant. Elle est
+    rétablie ici comme unique garde-fou anti-rejeu des codes promo.
+    """
+    promo_code = models.ForeignKey(
+        PromoCode,
+        on_delete=models.PROTECT,
+        related_name="usages",
+    )
 
-#     order = models.ForeignKey(
-#         "commandes.Order",
-#         on_delete=models.PROTECT,
-#         related_name="promo_usages",
-#         help_text="Commande sur laquelle le code a été appliqué.",
-#     )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="promo_usages",
+    )
 
-#     discount_applied = models.DecimalField(
-#         max_digits=12,
-#         decimal_places=2,
-#         help_text="Montant de réduction effectivement appliqué.",
-#     )
+    order = models.ForeignKey(
+        "commandes.Order",
+        on_delete=models.PROTECT,
+        related_name="promo_usages",
+        help_text="Commande sur laquelle le code a été appliqué.",
+    )
+
+    discount_applied = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Montant de réduction effectivement appliqué.",
+    )
 
 
-#     class Meta:
-#         db_table = "promotions_promo_usages"
-#         verbose_name = "Utilisation code promo"
-#         verbose_name_plural = "Utilisations codes promo"
-#         unique_together = [("promo_code", "user", "order")]  # Anti-double-usage
-#         indexes = [
-#             models.Index(fields=["promo_code", "user"]),
-#             models.Index(fields=["order"]),
-#         ]
+    class Meta:
+        db_table = "promotions_promo_usages"
+        verbose_name = "Utilisation code promo"
+        verbose_name_plural = "Utilisations codes promo"
+        unique_together = [("promo_code", "user", "order")]  # Anti-double-usage
+        indexes = [
+            models.Index(fields=["promo_code", "user"]),
+            models.Index(fields=["order"]),
+        ]
 
-#     def __str__(self):
-#         return f"{self.promo_code.code} × {self.user.email} ({self.discount_applied} FCFA)"
+    def __str__(self):
+        return f"{self.promo_code.code} × {self.user.email} ({self.discount_applied} FCFA)"
 
-#     @classmethod
-#     def get_user_usage_count(cls, promo_code, user) -> int:
-#         """Compte les utilisations d'un code par un utilisateur spécifique."""
-#         return cls.objects.filter(promo_code=promo_code, user=user).count()
+    @classmethod
+    def get_user_usage_count(cls, promo_code, user) -> int:
+        """Compte les utilisations d'un code par un utilisateur spécifique."""
+        return cls.objects.filter(promo_code=promo_code, user=user).count()
 
 
 class Soldes(BaseModel):

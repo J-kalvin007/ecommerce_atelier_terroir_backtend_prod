@@ -33,6 +33,25 @@ class PromoTierRestrictionError(PromoCodeError):
     default_code = "promo_tier_restricted"
 
 
+class PromoQuotaExceededError(PromoCodeError):
+    """
+    Le quota d'utilisation du code promo est atteint.
+
+    Levée notamment par PromoService.apply_code lorsque l'incrément atomique du
+    compteur d'utilisations n'affecte aucune ligne (code désactivé entre la
+    validation et l'application). L'exception était référencée dans le service
+    sans jamais avoir été définie : le premier appel réel levait NameError.
+    """
+    default_message = "Ce code promo n'est plus disponible."
+    default_code = "promo_quota_exceeded"
+
+
+class PromoUserQuotaExceededError(PromoCodeError):
+    """L'utilisateur a déjà consommé ce code promo."""
+    default_message = "Vous avez déjà utilisé ce code promo."
+    default_code = "promo_user_quota_exceeded"
+
+
 class FlashSaleError(Exception):
     """Exception de base pour les erreurs de flash sale."""
     pass

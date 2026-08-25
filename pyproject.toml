@@ -158,7 +158,10 @@ lint.isort.force-single-line = true
 keep_full_version = true
 
 # ==== pytest ====
-[tool.pytest]
+# La table DOIT s'appeler [tool.pytest.ini_options] : pytest ignore purement et
+# simplement une table [tool.pytest]. Sous l'ancien nom, `--ds=config.settings.test`
+# n'était jamais appliqué et la suite tournait sans settings Django.
+[tool.pytest.ini_options]
 addopts = [
   "--ds=config.settings.test",
   "--reuse-db",
@@ -169,12 +172,24 @@ python_files = [
   "tests.py",
   "test_*.py",
 ]
+testpaths = [
+  "apps",
+  "ecommerce_backend",
+  "tests",
+]
 
 # ==== Coverage ====
+# `apps/` porte 100 % de la logique métier (paiements, commandes, promotions,
+# fidélité). L'exclure de la mesure rendait la couverture structurellement
+# aveugle au code qui compte.
 [tool.coverage.run]
-include = [ "ecommerce_backend/**" ]
-omit = [ "*/migrations/*", "*/tests/*" ]
+include = [ "apps/**", "ecommerce_backend/**" ]
+omit = [ "*/migrations/*", "*/tests/*", "*/tests.py", "*/__pycache__/*" ]
 plugins = [ "django_coverage_plugin" ]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
 
 # ==== mypy ====
 [tool.mypy]

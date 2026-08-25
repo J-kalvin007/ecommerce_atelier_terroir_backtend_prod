@@ -281,9 +281,6 @@ class AdminLoyaltyProfileViewSet(viewsets.ModelViewSet):
         })
 
 
-from drf_spectacular.utils import extend_schema_view
-from .models import PointValue, LoyaltyRewardRule
-from .serializers import AdminPointValueSerializer, LoyaltyRewardRuleSerializer
 
 
 @extend_schema_view(

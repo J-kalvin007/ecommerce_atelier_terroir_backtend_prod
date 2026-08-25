@@ -8,17 +8,19 @@ import logging
 from decimal import Decimal
 from typing import Optional, Tuple
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.utils import timezone
 
 from .exceptions import (
     InvalidPromoCodeError,
     PromoExpiredError,
+    PromoQuotaExceededError,
     PromoTierRestrictionError,
+    PromoUserQuotaExceededError,
     PackError,
 )
-from .models import PromoCode, Soldes, Banner, Pack
+from .models import PromoCode, PromoUsage, Soldes, Banner, Pack
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +90,14 @@ class PromoService:
         if promo.expires_at and now > promo.expires_at:
             raise PromoExpiredError()
 
-        # 3. Restriction de palier de fidélité
+        # 3. Quota par utilisateur — un code ne peut être consommé qu'une fois
+        # par compte. C'est le garde-fou anti-rejeu rétabli avec le modèle
+        # PromoUsage ; sans lui, un même code était réutilisable à l'infini.
+        if user is not None and getattr(user, "is_authenticated", False):
+            if PromoUsage.objects.filter(promo_code=promo, user=user).exists():
+                raise PromoUserQuotaExceededError()
+
+        # 4. Restriction de palier de fidélité
         if promo.restricted_to_tiers.exists():
             try:
                 from apps.fidelites.models import LoyaltyProfile
@@ -102,7 +111,7 @@ class PromoService:
                     "Ce code promo est réservé à certains niveaux de fidélité."
                 )
 
-        # 4. Calcul de la réduction
+        # 5. Calcul de la réduction
         discount = promo.calculate_discount(cart_total, cart_items)
 
         return promo, discount
@@ -145,6 +154,26 @@ class PromoService:
 
         if not updated:
             raise PromoQuotaExceededError("Quota atteint pendant l'application.")
+
+        # Tracer l'usage : la contrainte unique (promo_code, user, order) est la
+        # seule garantie réellement atomique contre le double usage, y compris
+        # sous requêtes concurrentes.
+        try:
+            with transaction.atomic():
+                PromoUsage.objects.create(
+                    promo_code=promo_code,
+                    user=user,
+                    order=order,
+                    discount_applied=discount_amount,
+                )
+        except IntegrityError as exc:
+            logger.warning(
+                "Double application du code promo %s par %s sur la commande %s.",
+                promo_code.code,
+                getattr(user, "email", user),
+                getattr(order, "reference", order),
+            )
+            raise PromoUserQuotaExceededError() from exc
 
         # Appliquer la réduction à la commande
         order.discount_amount = F("discount_amount") + discount_amount
@@ -250,28 +279,44 @@ class PackService:
         """
         Décrémente le stock de toutes les variantes incluses dans le pack.
         Lève PackError en cas de stock insuffisant sur l'un des composants.
+
+        Deux règles structurantes, à l'origine du bug de stock corrompu :
+
+        1. Le stock est relu SOUS VERROU (`select_for_update`) puis réécrit avec
+           une valeur entière. L'ancienne implémentation posait
+           `variant.stock = F('stock') - n` : après le `save()`, l'attribut
+           Python contenait encore une expression SQL non résolue. Le signal
+           `sync_product_stock_from_default_variant` la recevait telle quelle et
+           la réappliquait au produit, ce qui décrémentait une seconde fois.
+
+        2. Le stock du produit principal N'EST PLUS touché ici. Sa mise à jour
+           est la responsabilité exclusive du signal post_save de ProductVariant
+           (apps/catalog/signals.py), qui recopie le stock de la variante par
+           défaut. Écrire aux deux endroits provoquait une troisième
+           décrémentation.
         """
-        items = pack.items.select_related('product_variant').all()
-        
+        from apps.catalog.models import ProductVariant
+
+        # Seuls `quantity` et `product_variant_id` sont utilisés ici : la variante
+        # elle-même est relue sous verrou juste après, un select_related serait
+        # une lecture inutile et surtout non verrouillée.
+        items = pack.items.all()
+
         for item in items:
-            variant = item.product_variant
             required_variant_qty = item.quantity * requested_quantity
-            
-            # Optionnel: on pourrait re-vérifier avec select_for_update() ici
-            # Mais la méthode check_pack_availability() fait un premier filtre,
-            # et si c'est appelé depuis OrderService.create_order, on peut avoir 
-            # déjà géré le locking.
-            
+
+            # Verrou pessimiste sur la ligne : la lecture du stock et son
+            # écriture sont sérialisées, ce qui rend l'opération sûre en
+            # concurrence sans passer par une expression F() non réévaluée.
+            variant = ProductVariant.objects.select_for_update().get(
+                pk=item.product_variant_id,
+            )
+
             if variant.stock < required_variant_qty:
                 raise PackError(
                     f"Stock insuffisant sur le composant '{variant.name}' "
                     f"pour composer {requested_quantity} pack(s) '{pack.name}'."
                 )
-                
-            variant.stock = F('stock') - required_variant_qty
-            variant.save(update_fields=['stock'])
-            
-            # MAJ stock produit principal par cohérence avec l'architecture existante
-            if variant.product:
-                variant.product.stock = F('stock') - required_variant_qty
-                variant.product.save(update_fields=['stock'])
+
+            variant.stock = variant.stock - required_variant_qty
+            variant.save(update_fields=['stock', 'updated_at'])

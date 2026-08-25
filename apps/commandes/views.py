@@ -27,6 +27,41 @@ from apps.core.permissions import IsCustomer, IsPlatformAdmin
 
 
 # ==================================================
+# CONTRÔLE D'ACCÈS AUX COMMANDES
+# ==================================================
+
+def check_order_access(request, order):
+    """
+    Vérifie que l'appelant a le droit de consulter `order`.
+
+    Les vues de consultation restent en AllowAny pour préserver le parcours de
+    commande sans compte : une commande invité (order.user is None) n'est
+    rattachée à personne et n'est atteignable que via son identifiant.
+
+    Dès qu'une commande est rattachée à un compte, elle devient strictement
+    privée : seul son propriétaire — ou un administrateur plateforme — peut la
+    lire. Sans ce contrôle, tout utilisateur authentifié pouvait consulter le
+    détail et l'historique de la commande d'un tiers (montants, adresse,
+    téléphone, articles).
+
+    Raises:
+        PermissionDenied: si l'appelant n'est pas autorisé.
+    """
+    if order.user_id is None:
+        return
+
+    from rest_framework.exceptions import PermissionDenied
+
+    user = request.user
+    if not user.is_authenticated:
+        raise PermissionDenied(_("Vous devez être connecté pour voir cette commande."))
+
+    is_platform_admin = user.is_superuser or getattr(user, "role", None) == "platform_admin"
+    if order.user_id != user.id and not is_platform_admin:
+        raise PermissionDenied(_("Cette commande ne vous appartient pas."))
+
+
+# ==================================================
 # CLIENTS VIEWS
 # ==================================================
 
@@ -132,13 +167,9 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
         if not order:
             from rest_framework.exceptions import NotFound
             raise NotFound(_("Commande introuvable."))
-            
+
         # Permission check
-        if order.user:
-            user = self.request.user
-            if not user.is_authenticated:
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied(_("Vous devez être connecté pour voir cette commande."))
+        check_order_access(self.request, order)
 
         return order
 
@@ -171,12 +202,8 @@ class OrderHistoryAPIView(generics.ListAPIView):
             raise NotFound(_("Commande introuvable."))
 
         # Permission check
-        if order.user:
-            user = self.request.user
-            if not user.is_authenticated:
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied(_("Vous devez être connecté pour voir cette commande."))
-            
+        check_order_access(self.request, order)
+
         return order.status_history.all().order_by("created_at")
 
 

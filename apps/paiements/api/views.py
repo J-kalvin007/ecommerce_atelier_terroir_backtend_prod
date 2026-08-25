@@ -1,13 +1,14 @@
 import hashlib
+import hmac
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from celery.worker.state import total_count
 from django.conf import settings
 from django.db import transaction
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
-from paydunya import Store, Invoice, InvoiceItem
+from paydunya import Store, Invoice
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -16,170 +17,374 @@ from rest_framework.views import APIView
 
 from apps.commandes.models import Order, OrderStatus
 from apps.commandes.services import OrderService
+from apps.paiements.exceptions import PaymentGatewayError
+from apps.paiements.gateways.paydunya import PayDunyaGateway
 from apps.paiements.models import Wallet, Payment, WalletTransaction
 
-# Create and configure logger
-logging.basicConfig(
-    filename="newfile.log",
-    format="%(name)s: %(asctime)s | %(levelname)s | %(filename)s%(lineno)s | %(process)d >>> %(message)s",  # noqa: E501
-    filemode="w",
-)
+# Logger nommé, câblé sur la configuration LOGGING de Django (console + Sentry).
+# L'ancien logging.basicConfig(filename="newfile.log", filemode="w") détournait le
+# logger racine, écrasait le journal à chaque import et privait la production de
+# toute trace de paiement exploitable.
+logger = logging.getLogger(__name__)
 
-# Creating an object
-logger = logging.getLogger()
 
+# Statuts de commande à partir desquels un paiement peut encore être initié.
+PAYABLE_ORDER_STATUSES = (OrderStatus.DRAFT, OrderStatus.PENDING_PAYMENT)
+
+
+def _is_platform_admin(user) -> bool:
+    """Indique si l'utilisateur dispose des droits d'administration plateforme."""
+    return bool(
+        user
+        and user.is_authenticated
+        and (user.is_superuser or getattr(user, "role", None) == "platform_admin")
+    )
+
+
+def _assert_can_act_on_order(request, order) -> Response | None:
+    """
+    Vérifie que l'appelant a le droit d'agir sur `order`.
+
+    Règle métier :
+      - commande invité (order.user is None) : accessible via son identifiant,
+        le parcours de paiement sans compte doit rester possible ;
+      - commande rattachée à un compte : réservée à son propriétaire et aux
+        administrateurs plateforme.
+
+    Returns:
+        Response d'erreur si l'accès doit être refusé, None si l'accès est permis.
+    """
+    if order.user_id is None:
+        return None
+
+    user = request.user
+    if not user.is_authenticated:
+        logger.warning(
+            "[IDOR] Tentative anonyme sur la commande %s (propriétaire %s).",
+            order.pk,
+            order.user_id,
+        )
+        return Response(
+            {"detail": "Vous devez être connecté pour accéder à cette commande."},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if order.user_id != user.id and not _is_platform_admin(user):
+        logger.warning(
+            "[IDOR] Utilisateur %s a tenté d'accéder à la commande %s appartenant à %s.",
+            user.id,
+            order.pk,
+            order.user_id,
+        )
+        return Response(
+            {"detail": "Cette commande ne vous appartient pas."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    return None
+
+
+def _to_decimal(raw_value) -> Decimal:
+    """Convertit une valeur de montant hétérogène (str, int, float) en Decimal sûr."""
+    if raw_value in (None, ""):
+        return Decimal("0.00")
+    try:
+        return Decimal(str(raw_value)).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError, TypeError):
+        logger.error("Montant illisible reçu de PayDunya : %r", raw_value)
+        return Decimal("0.00")
 
 
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def paydunya_webhook(request):
+    """
+    IPN PayDunya — POST /api/v1/paiements/ipn/
+
+    Chaîne de confiance appliquée, dans cet ordre :
+
+      1. Contrôle du hash `sha512(MASTER_KEY)` en comparaison à temps constant.
+         Ce hash est une constante partagée : il filtre le bruit mais ne prouve
+         RIEN sur le montant ni le statut. Il n'est donc jamais suffisant.
+      2. Idempotence : si un Payment SUCCESS existe déjà pour ce token, on sort
+         immédiatement en 200 (un rejeu ne doit jamais recréditer ni redébiter).
+      3. Vérification serveur→serveur auprès de PayDunya (`verify_payment`).
+         C'est la SEULE source de vérité : statut, montant et description sont
+         relus depuis l'API, jamais depuis le corps du POST.
+      4. Traitement métier sous transaction + verrou pessimiste sur la ligne
+         Order/Wallet concernée.
+    """
     logger.info("=== Webhook PayDunya reçu ===")
 
     data = request.POST.dict()
 
     token = data.get("data[invoice][token]")
     status_payment = data.get("data[status]")  # 'completed', 'pending', ou 'cancelled'
-    description_payment = data.get("data[invoice][description]")  
+    description_payment = data.get("data[invoice][description]")
     amount_payment_str = data.get("data[invoice][total_amount]")
-    amount_payment = Decimal(str(amount_payment_str)) if amount_payment_str else Decimal("0.00")
+    amount_payment = _to_decimal(amount_payment_str)
 
-    logger.info(f"Voici les données brute recues {data} - Détails de la transaction -> Token: {token}, Statut: {status_payment}, Description: {description_payment}, Montant: {amount_payment}")
+    logger.info(
+        "Notification brute — Token: %s, Statut annoncé: %s, Description annoncée: %s, "
+        "Montant annoncé: %s",
+        token,
+        status_payment,
+        description_payment,
+        amount_payment,
+    )
 
+    # ── 1. Contrôle du hash partagé (filtre bon marché, non probant) ──────────
     master_key = settings.PAYDUNYA_CONFIG["MASTER_KEY"].encode()
+    expected_hash = hashlib.sha512(master_key).hexdigest()
+    received_hash = data.get("data[hash]") or ""
 
-    if data.get("data[hash]") != hashlib.sha512(master_key).hexdigest():
+    if not hmac.compare_digest(received_hash, expected_hash):
         logger.error("SIGNATURE INVALIDE : Le hash reçu ne correspond pas.")
         return Response(
             {"error": "Signature invalide"},
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # Traitement du statut de la commande
-    if status_payment == "completed":
-        logger.info("Statut de la transaction 'completed' validé.")
-
-        if description_payment == "ACHAT-PRODUIT":
-            logger.info("Traitement d'une transaction de type ACHAT-PRODUIT.")
-            if not token:
-                logger.error("Token de transaction manquant pour l'achat de produit.")
-                return Response({"detail": "token de la transaction invalide"}, status=status.HTTP_400_BAD_REQUEST)
-
-            order = get_object_or_404(Order, reference=token)
-            logger.info(f"Commande trouvée pour le token {token} : {order.reference}.")
-            
-            with transaction.atomic():
-                OrderService.update_status(
-                    order=order,
-                    new_status=OrderStatus.PAID,
-                    changed_by=None,
-                    comment="Paiement validé par PayDunya (Webhook View)"
-                )
-                logger.info(f"Statut de la commande {order.reference} mis à jour avec succès : PAID.")
-
-                # --- Décrémentation des stocks ---
-                from apps.catalog.models import ProductVariant
-                for item in order.items.all():
-                    # 1. Chercher si la ligne correspond à une variation via le SKU
-                    variant = ProductVariant.objects.filter(sku=item.product_sku).first()
-                    
-                    if variant:
-                        ancien_stock = variant.stock
-                        variant.stock = max(0, variant.stock - item.quantity)
-                        variant.save()
-                        logger.info(f"Stock de la variante '{variant.name}' (SKU: {variant.sku}) décrémenté : {ancien_stock} -> {variant.stock}")
-                        
-                        produit_principal = variant.product
-                        if produit_principal:
-                            ancien_stock_p = produit_principal.stock
-                            produit_principal.stock = max(0, produit_principal.stock - item.quantity)
-                            produit_principal.save()
-                            logger.info(f"Stock du produit '{produit_principal.name}' (SKU: {produit_principal.sku}) décrémenté : {ancien_stock_p} -> {produit_principal.stock}")
-                    else:
-                        # 2. Si aucune variation ne correspond, on décrémente le produit principal
-                        produit_principal = item.product
-                        if produit_principal:
-                            ancien_stock = produit_principal.stock
-                            produit_principal.stock = max(0, produit_principal.stock - item.quantity)
-                            produit_principal.save()
-                            logger.info(f"Stock du produit '{produit_principal.name}' (SKU: {produit_principal.sku}) décrémenté : {ancien_stock} -> {produit_principal.stock}")
-                        else:
-                            logger.warning(f"Impossible de décrémenter le stock : aucun produit/variante trouvé pour le SKU {item.product_sku}")
-
-                Payment.objects.create(
-                    order=order,
-                    user=order.user,
-                    provider=Payment.Provider.PAYDUNYA,
-                    payment_type=Payment.PaymentType.ORDER_PAYMENT,
-                    amount=amount_payment,
-                    status=Payment.Status.SUCCESS,
-                    reference_externe=token,
-                )
-                logger.info(f"Ligne de paiement globale enregistrée avec succès pour la commande {order.reference}.")
-
-            return Response(
-                {"message": "Commande validée avec succès"},
-                status=status.HTTP_200_OK,
-            )
-
-        elif description_payment == "RECHARGE-WALLET":
-            logger.info("Traitement d'une transaction de type RECHARGE-WALLET.")
-            if not token:
-                logger.error("Token de transaction manquant pour la recharge de wallet.")
-                return Response({"detail": "token de la transaction invalide"}, status=status.HTTP_400_BAD_REQUEST)
-
-            wallet = get_object_or_404(Wallet, reference=token)
-            logger.info(f"Wallet trouvé pour le token {token}. Solde actuel : {wallet.balance}.")
-            
-            with transaction.atomic():
-                solde = wallet.balance
-                wallet.balance = solde + amount_payment
-                wallet.save()
-                logger.info(f"Wallet {wallet.reference} crédité avec succès. Nouveau solde : {wallet.balance}.")
-
-                WalletTransaction.objects.create(
-                    wallet=wallet,
-                    transaction_type=WalletTransaction.Type.DEPOSIT,
-                    amount=amount_payment,
-                    reference=token,
-                    status=WalletTransaction.Status.SUCCESS,
-                )
-                logger.info(f"Transaction de wallet (WalletTransaction) créée avec succès pour {wallet.reference}.")
-
-                Payment.objects.create(
-                    wallet=wallet,
-                    user=wallet.user,
-                    provider=Payment.Provider.PAYDUNYA,
-                    payment_type=Payment.PaymentType.WALLET_TOPUP,
-                    amount=amount_payment,
-                    status=Payment.Status.SUCCESS,
-                    reference_externe=token,
-                )
-                logger.info(f"Paiement global enregistré avec succès pour la recharge de {wallet.reference}.")
-
-            return Response(
-                {"message": "Recharge validée avec succès"},
-                status=status.HTTP_200_OK,
-            )
-
-        else:
-            logger.warning(f"Description de paiement non reconnue : {description_payment}.")
-
-    elif status_payment == "cancelled":
-        logger.warning(f"La transaction {token} a été annulée.")
+    if not token:
+        logger.error("Token de transaction manquant dans la notification.")
         return Response(
-            {"message": "Statut de paiement annulé traité"},
+            {"detail": "token de la transaction invalide"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # ── 2. Idempotence : ce token a-t-il déjà été encaissé ? ──────────────────
+    if Payment.objects.filter(
+        reference_externe=token,
+        status=Payment.Status.SUCCESS,
+    ).exists():
+        logger.info(
+            "Notification ignorée : le token %s a déjà été traité avec succès.",
+            token,
+        )
+        return Response(
+            {"message": "Transaction déjà traitée"},
             status=status.HTTP_200_OK,
         )
 
-    logger.warning(f"Statut de transaction ignoré : {status_payment}")
+    # ── 3. Vérification serveur→serveur : seule source de vérité ─────────────
+    try:
+        verification = PayDunyaGateway().verify_payment(token)
+    except PaymentGatewayError as exc:
+        logger.error(
+            "Vérification PayDunya impossible pour le token %s : %s", token, exc,
+        )
+        return Response(
+            {"detail": "Vérification du paiement auprès de PayDunya impossible."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    verified_status = verification.get("status")
+    verified_raw = verification.get("raw") or {}
+    verified_invoice = verified_raw.get("invoice") or {}
+    verified_description = verified_invoice.get("description") or ""
+    verified_amount = _to_decimal(verification.get("amount"))
+
+    logger.info(
+        "Vérification PayDunya — Token: %s, Statut vérifié: %s, Description vérifiée: %s, "
+        "Montant vérifié: %s",
+        token,
+        verified_status,
+        verified_description,
+        verified_amount,
+    )
+
+    if verified_status != "completed":
+        logger.warning(
+            "Statut vérifié non finalisé pour le token %s : %s (annoncé : %s).",
+            token,
+            verified_status,
+            status_payment,
+        )
+        return Response(
+            {"message": f"statut ignoré : {verified_status}"},
+            status=status.HTTP_200_OK,
+        )
+
+    # ── 4. Traitement métier, piloté par les données vérifiées ───────────────
+    if verified_description == "ACHAT-PRODUIT":
+        return _handle_verified_order_payment(token, verified_amount)
+
+    if verified_description == "RECHARGE-WALLET":
+        return _handle_verified_wallet_topup(token, verified_amount)
+
+    logger.warning(
+        "Description de paiement non reconnue pour le token %s : %r.",
+        token,
+        verified_description,
+    )
     return Response(
-        {"message": f"statut ignoré : {status_payment}"},
+        {"message": f"description ignorée : {verified_description}"},
         status=status.HTTP_200_OK,
     )
 
 
+def _handle_verified_order_payment(token: str, verified_amount: Decimal) -> Response:
+    """
+    Encaisse une commande dont le paiement a été confirmé par PayDunya.
 
+    Le stock N'EST PAS décrémenté ici : il l'a déjà été au moment de la création
+    de la commande (OrderService.create_order), qui est le point unique de
+    réservation du stock. Le décrémenter une seconde fois au paiement doublait
+    la consommation de stock de chaque commande payée.
+    """
+    logger.info("Traitement d'une transaction vérifiée de type ACHAT-PRODUIT.")
+
+    with transaction.atomic():
+        # Verrou pessimiste : sérialise deux notifications concurrentes portant
+        # sur la même commande (rejeu réseau de PayDunya).
+        order = Order.objects.select_for_update().filter(reference=token).first()
+
+        if order is None:
+            logger.error("Aucune commande ne porte la référence %s.", token)
+            return Response(
+                {"detail": "Commande introuvable pour ce token."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        logger.info("Commande trouvée pour le token %s : %s.", token, order.reference)
+
+        # Seconde barrière d'idempotence, à l'intérieur du verrou.
+        if order.status == OrderStatus.PAID:
+            logger.info(
+                "Commande %s déjà au statut PAID : notification ignorée.",
+                order.reference,
+            )
+            return Response(
+                {"message": "Commande déjà validée"},
+                status=status.HTTP_200_OK,
+            )
+
+        # Contrôle du montant : un encaissement inférieur au dû ne valide pas la
+        # commande. Le montant retenu est celui confirmé par PayDunya.
+        if verified_amount < order.total_final:
+            logger.error(
+                "Sous-paiement détecté sur la commande %s : %s FCFA encaissés "
+                "pour %s FCFA attendus.",
+                order.reference,
+                verified_amount,
+                order.total_final,
+            )
+            return Response(
+                {"detail": "Montant encaissé inférieur au montant de la commande."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        OrderService.update_status(
+            order=order,
+            new_status=OrderStatus.PAID,
+            changed_by=None,
+            comment="Paiement validé par PayDunya (vérifié côté serveur)",
+        )
+        logger.info(
+            "Statut de la commande %s mis à jour avec succès : PAID.", order.reference,
+        )
+
+        Payment.objects.create(
+            order=order,
+            user=order.user,
+            provider=Payment.Provider.PAYDUNYA,
+            payment_type=Payment.PaymentType.ORDER_PAYMENT,
+            amount=verified_amount,
+            status=Payment.Status.SUCCESS,
+            reference_externe=token,
+        )
+        logger.info(
+            "Ligne de paiement globale enregistrée avec succès pour la commande %s.",
+            order.reference,
+        )
+
+    return Response(
+        {"message": "Commande validée avec succès"},
+        status=status.HTTP_200_OK,
+    )
+
+
+def _handle_verified_wallet_topup(token: str, verified_amount: Decimal) -> Response:
+    """Crédite un portefeuille dont la recharge a été confirmée par PayDunya."""
+    logger.info("Traitement d'une transaction vérifiée de type RECHARGE-WALLET.")
+
+    if verified_amount <= Decimal("0.00"):
+        logger.error("Montant de recharge nul ou négatif pour le token %s.", token)
+        return Response(
+            {"detail": "Montant de recharge invalide."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    with transaction.atomic():
+        wallet = Wallet.objects.select_for_update().filter(reference=token).first()
+
+        if wallet is None:
+            logger.error("Aucun portefeuille ne porte la référence %s.", token)
+            return Response(
+                {"detail": "Portefeuille introuvable pour ce token."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        logger.info(
+            "Wallet trouvé pour le token %s. Solde actuel : %s.",
+            token,
+            wallet.balance,
+        )
+
+        # Seconde barrière d'idempotence : `WalletTransaction.reference` est
+        # unique en base, ce contrôle évite de heurter l'IntegrityError.
+        if WalletTransaction.objects.filter(reference=token).exists():
+            logger.info(
+                "Recharge déjà enregistrée pour le token %s : notification ignorée.",
+                token,
+            )
+            return Response(
+                {"message": "Recharge déjà validée"},
+                status=status.HTTP_200_OK,
+            )
+
+        # Incrément atomique côté base : aucune lecture-modification-écriture en
+        # Python, donc aucune perte de mise à jour concurrente.
+        wallet.balance = F("balance") + verified_amount
+        wallet.save(update_fields=["balance", "updated_at"])
+        wallet.refresh_from_db(fields=["balance"])
+        logger.info(
+            "Wallet %s crédité avec succès. Nouveau solde : %s.",
+            wallet.reference,
+            wallet.balance,
+        )
+
+        WalletTransaction.objects.create(
+            wallet=wallet,
+            transaction_type=WalletTransaction.Type.DEPOSIT,
+            amount=verified_amount,
+            reference=token,
+            status=WalletTransaction.Status.SUCCESS,
+        )
+        logger.info(
+            "Transaction de wallet (WalletTransaction) créée avec succès pour %s.",
+            wallet.reference,
+        )
+
+        Payment.objects.create(
+            wallet=wallet,
+            user=wallet.user,
+            provider=Payment.Provider.PAYDUNYA,
+            payment_type=Payment.PaymentType.WALLET_TOPUP,
+            amount=verified_amount,
+            status=Payment.Status.SUCCESS,
+            reference_externe=token,
+        )
+        logger.info(
+            "Paiement global enregistré avec succès pour la recharge de %s.",
+            wallet.reference,
+        )
+
+    return Response(
+        {"message": "Recharge validée avec succès"},
+        status=status.HTTP_200_OK,
+    )
 
 
 class InitializePaydunyaPaymentView(APIView):
@@ -189,13 +394,28 @@ class InitializePaydunyaPaymentView(APIView):
 
         # Recuperation des donnees de la commande
         order_id = request.data.get("order_id")
-        description = request.data.get("description")
 
         if not order_id:
             return Response({"detail": "order_id invalide"}, status=status.HTTP_400_BAD_REQUEST)
 
         order = get_object_or_404(Order, id=order_id)
-        logger.info(f"[Initialisation de paiement] Commande trouvée: {order.reference}")
+
+        # SÉCURITÉ — IDOR : la vue est publique pour permettre le paiement invité,
+        # mais une commande rattachée à un compte n'est payable que par ce compte.
+        permission_error = _assert_can_act_on_order(request, order)
+        if permission_error is not None:
+            return permission_error
+
+        # Une commande déjà payée, expédiée ou annulée ne doit plus générer de
+        # facture PayDunya : cela écraserait sa référence et ouvrirait la porte à
+        # un second encaissement.
+        if order.status not in PAYABLE_ORDER_STATUSES:
+            return Response(
+                {"detail": f"Cette commande ne peut plus être payée (statut : {order.status})."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        logger.info("[Initialisation de paiement] Commande trouvée: %s", order.reference)
         total_amount = float(order.total_final)
 
         # 1. Initialiser le magasin
@@ -224,7 +444,7 @@ class InitializePaydunyaPaymentView(APIView):
             order.reference = response_or_error.get(
                 "token",
             )
-            order.save()
+            order.save(update_fields=["reference", "updated_at"])
             return Response(
                 {
                     "success": True,
@@ -258,7 +478,24 @@ class RechargeWalletPaydunyaPaymentView(APIView):
             return Response({"detail": "wallet_id invalide"}, status=status.HTTP_400_BAD_REQUEST)
 
         wallet = get_object_or_404(Wallet, id=wallet_id)
-        logger.info(f"[Recharge de wallet] Wallet trouvée: {wallet.reference}")
+
+        # SÉCURITÉ — IDOR : un utilisateur authentifié ne peut initier une recharge
+        # que sur son propre portefeuille. Sans ce contrôle, n'importe qui pouvait
+        # écraser la référence PayDunya du wallet d'un tiers et détourner l'IPN
+        # de recharge correspondante.
+        if wallet.user_id != request.user.id and not _is_platform_admin(request.user):
+            logger.warning(
+                "[IDOR] Utilisateur %s a tenté de recharger le portefeuille %s appartenant à %s.",
+                request.user.id,
+                wallet.pk,
+                wallet.user_id,
+            )
+            return Response(
+                {"detail": "Ce portefeuille ne vous appartient pas."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        logger.info("[Recharge de wallet] Wallet trouvée: %s", wallet.reference)
 
         if not montant:
             return Response({"detail": "Montant a credite invalide"}, status=status.HTTP_400_BAD_REQUEST)
@@ -266,8 +503,16 @@ class RechargeWalletPaydunyaPaymentView(APIView):
         if not description:
             return Response({"detail": "Description obligatoire"}, status=status.HTTP_400_BAD_REQUEST)
 
-        logger.info(f"[Initialisation de paiement] Recharge du wallet du client avec le montant: {montant}")
-        total_amount = float(montant)
+        # Le montant provient du client : il doit être numérique et strictement positif.
+        montant_decimal = _to_decimal(montant)
+        if montant_decimal <= Decimal("0.00"):
+            return Response({"detail": "Montant a credite invalide"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(
+            "[Initialisation de paiement] Recharge du wallet du client avec le montant: %s",
+            montant_decimal,
+        )
+        total_amount = float(montant_decimal)
 
         # 1. Initialiser le magasin
         store = Store(
@@ -295,7 +540,7 @@ class RechargeWalletPaydunyaPaymentView(APIView):
             wallet.reference = response_or_error.get(
                 "token",
             )
-            wallet.save()
+            wallet.save(update_fields=["reference", "updated_at"])
             return Response(
                 {
                     "success": True,

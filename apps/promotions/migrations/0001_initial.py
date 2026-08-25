@@ -16,7 +16,11 @@ class Migration(migrations.Migration):
     dependencies = [
         ('catalog', '0004_alter_category_options_alter_product_options_and_more'),
         ('commandes', '0002_alter_cartitem_options_and_more'),
-        # ('fidelites', '0001_initial'),
+        # La M2M PromoCode.restricted_to_tiers pointe vers fidelites.LoyaltyTier :
+        # cette dépendance DOIT être déclarée, sinon la table de liaison est créée
+        # avant fidelites_loyaltytier et un build de base neuf échoue avec
+        # « Related model 'fidelites.loyaltytier' cannot be resolved ».
+        ('fidelites', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

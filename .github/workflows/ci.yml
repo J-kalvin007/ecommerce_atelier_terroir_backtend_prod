@@ -32,6 +32,27 @@ jobs:
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
+  # Gate bloquant, séparé du pre-commit informatif : il n'échoue QUE sur les
+  # bugs réels (noms non définis, redéfinitions, erreurs de syntaxe), pas sur
+  # les 2500+ remarques stylistiques du profil Ruff complet. Objectif : qu'un
+  # symbole cassé ne puisse jamais être fusionné, sans noyer le signal.
+  critical-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: '.python-version'
+
+      - name: Install Ruff
+        run: pip install ruff==0.15.16
+
+      - name: Ruff — règles bloquantes (bugs réels uniquement)
+        run: ruff check --select F821,F811,F823,F406,F701,F702,E9 apps ecommerce_backend config
+
   # With no caching at all the entire ci process takes 3m to complete!
   pytest:
     runs-on: ubuntu-latest

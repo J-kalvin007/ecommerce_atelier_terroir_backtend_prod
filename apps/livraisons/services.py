@@ -1,6 +1,6 @@
 from django.db import transaction
 from decimal import Decimal
-from .models import FraisLivraison, Delivery, DeliveryStatus
+from .models import FraisLivraison, Delivery, DeliveryStatus, Livreur
 from apps.commandes.models import Order
 
 class LivraisonService:
@@ -39,7 +39,7 @@ class DeliveryService:
 
     @staticmethod
     @transaction.atomic
-    def assign_livreur(delivery: Delivery, livreur: 'Livreur', user=None) -> Delivery:
+    def assign_livreur(delivery: Delivery, livreur: Livreur, user=None) -> Delivery:
         """
         Assigne un livreur à une livraison et passe le statut à ASSIGNED.
         Crée une entrée d'historique.

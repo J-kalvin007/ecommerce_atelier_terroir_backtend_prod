@@ -391,6 +391,32 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # ─── Limitation de débit ──────────────────────────────────────────────────
+    # Filet global appliqué à TOUTES les vues DRF. Les valeurs sont volontairement
+    # larges : elles n'entravent pas une navigation normale mais coupent court
+    # au scraping et au bourrinage d'endpoints.
+    # Les vues coûteuses (IA / OpenAI) surchargent ces classes avec des scopes
+    # dédiés et beaucoup plus bas — voir apps/chatbot/throttles.py.
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        # Portée globale
+        "anon": env("THROTTLE_RATE_ANON", default="60/min"),
+        "user": env("THROTTLE_RATE_USER", default="240/min"),
+        # Chatbot IA — chaque requête déclenche jusqu'à 2 appels OpenAI (1000 tokens)
+        "chatbot_anon": env("THROTTLE_RATE_CHATBOT_ANON", default="10/hour"),
+        "chatbot_user": env("THROTTLE_RATE_CHATBOT_USER", default="60/hour"),
+        "chatbot_monthly": env("THROTTLE_RATE_CHATBOT_MONTHLY", default="500/month"),
+        # Recherche IA — 1 appel OpenAI (jusqu'à 1500 tokens)
+        "ai_search_anon": env("THROTTLE_RATE_AI_SEARCH_ANON", default="10/hour"),
+        "ai_search_user": env("THROTTLE_RATE_AI_SEARCH_USER", default="60/hour"),
+        "ai_search_monthly": env("THROTTLE_RATE_AI_SEARCH_MONTHLY", default="500/month"),
+        # Recommandations — 100 % ORM, pas d'appel externe : quotas plus souples
+        "recommendation_anon": env("THROTTLE_RATE_RECO_ANON", default="60/hour"),
+        "recommendation_user": env("THROTTLE_RATE_RECO_USER", default="300/hour"),
+    },
 }
 
 
@@ -444,14 +470,24 @@ LOYALTY_FIRST_PURCHASE_BONUS_POINTS = env.int("LOYALTY_FIRST_PURCHASE_BONUS_POIN
 # Ajouter dans CELERY_BEAT_SCHEDULE (si vous utilisez django-celery-beat)
 
 
+# ATTENTION — Cette planification n'est exploitée que si un service `celery beat`
+# ET un service `celery worker` distincts sont réellement déployés. En production
+# (config/settings/production.py) Celery tourne en mode EAGER avec un broker
+# `memory://` : le planificateur n'existe pas et AUCUNE tâche listée ici ne
+# s'exécute jamais. Le chemin fiable aujourd'hui est la commande de management
+# `expirer_points_fidelite`, à brancher sur un cron Render :
+#     python manage.py expirer_points_fidelite
+#
+# Les clés `task` doivent correspondre au NOM ENREGISTRÉ de la tâche
+# (`@shared_task(name=...)`), pas à son chemin d'import : l'ancienne valeur
+# "apps.fidelites.tasks.expire_points_task" n'était résolue par aucun worker.
+# L'entrée "birthday-bonus-daily" a été retirée : `birthday_bonus_task` n'existe
+# pas dans le code et le modèle User ne porte aucune date de naissance ; la
+# planifier revenait à programmer un échec quotidien silencieux.
 CELERY_BEAT_SCHEDULE = {
     "expire-loyalty-points-daily": {
-        "task": "apps.fidelites.tasks.expire_points_task",
+        "task": "loyalty.expire_points",
         "schedule": crontab(hour=2, minute=0),  # Tous les jours à 02:00 UTC
-    },
-    "birthday-bonus-daily": {
-        "task": "apps.fidelites.tasks.birthday_bonus_task",
-        "schedule": crontab(hour=8, minute=0),  # Tous les jours à 08:00 UTC
     },
 }
 
@@ -471,13 +507,30 @@ ACCOUNT_USERNAME_REQUIRED = False
 # ─── PayDunya ─────────────────────────────────────────────────────────────────
 
 # PAYDUNYA CONFIG
+# SÉCURITÉ — Aucune valeur de repli secrète n'est codée dans le dépôt.
+# Les quatre clés proviennent EXCLUSIVEMENT de l'environnement :
+#   - local  : .envs/.local/.payDunya (chargé par config/settings/local.py)
+#   - prod   : variables d'environnement Render
+# En l'absence de variable, la valeur est vide : la passerelle refuse alors de
+# fonctionner (voir PayDunyaGateway) et config/settings/production.py fait
+# échouer le démarrage explicitement.
 PAYDUNYA_CONFIG = {
-    "MASTER_KEY": env("PAYDUNYA_MASTER_KEY", default="YT6VOJwb-SVMb-rBmM-pHcN-d0A6hT6soZby"),
-    "PUBLIC_KEY": env("PAYDUNYA_PUBLIC_KEY", default="test_public_AS9eYRp3bkJYMABX3epBz8Kdowj"),
-    "PRIVATE_KEY": env("PAYDUNYA_PRIVATE_KEY", default="test_private_jD0kWB4ClTX0fSggbaTucRsbqXW"),
-    "TOKEN": env("PAYDUNYA_TOKEN", default="E6ZDUp7TsqFmqNXsNilP"),
+    "MASTER_KEY": env("PAYDUNYA_MASTER_KEY", default=""),
+    "PUBLIC_KEY": env("PAYDUNYA_PUBLIC_KEY", default=""),
+    "PRIVATE_KEY": env("PAYDUNYA_PRIVATE_KEY", default=""),
+    "TOKEN": env("PAYDUNYA_TOKEN", default=""),
     "MODE": env("PAYDUNYA_MODE", default="test"),
 }
+
+# Exposition à plat des clés, attendue par apps.paiements.gateways.paydunya.PayDunyaGateway.
+# Sans ces settings, la passerelle démarrait avec des clés vides et tout appel
+# serveur→PayDunya (notamment verify_payment) était rejeté en 401.
+PAYDUNYA_MASTER_KEY = PAYDUNYA_CONFIG["MASTER_KEY"]
+PAYDUNYA_PUBLIC_KEY = PAYDUNYA_CONFIG["PUBLIC_KEY"]
+PAYDUNYA_PRIVATE_KEY = PAYDUNYA_CONFIG["PRIVATE_KEY"]
+PAYDUNYA_TOKEN = PAYDUNYA_CONFIG["TOKEN"]
+PAYDUNYA_MODE = PAYDUNYA_CONFIG["MODE"]
+PAYDUNYA_BASE_URL = env("PAYDUNYA_BASE_URL", default="https://app.paydunya.com/api/v1")
 
 PAYDUNYA_URLS = {
     "test": "https://paydunya.com",

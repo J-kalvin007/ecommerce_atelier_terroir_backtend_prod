@@ -5,7 +5,18 @@
 Tâches planifiées Celery pour le module de fidélisation.
 
 - expire_points : quotidienne, expire les points dépassés
-- birthday_bonus : quotidienne, attribue les bonus d'anniversaire
+
+Nom enregistré de la tâche : ``loyalty.expire_points`` — c'est cette chaîne, et
+non le chemin d'import, que doit référencer CELERY_BEAT_SCHEDULE.
+
+Tant qu'aucun worker Celery n'est déployé (Celery tourne en mode EAGER en
+production), l'expiration doit être déclenchée par la commande de management
+``python manage.py expirer_points_fidelite``, branchée sur un cron Render.
+Les deux points d'entrée appellent le même service : aucune logique dupliquée.
+
+Aucune tâche ``birthday_bonus_task`` n'est définie : le modèle User ne porte
+pas de date de naissance. L'entrée correspondante a été retirée de
+CELERY_BEAT_SCHEDULE, où elle référençait une tâche inexistante.
 """
 from celery import shared_task
 from celery.utils.log import get_task_logger

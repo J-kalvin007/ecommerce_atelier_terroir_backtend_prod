@@ -140,7 +140,13 @@ def sync_default_variant_for_product(sender, instance, created, **kwargs):
     et éviter toute boucle de rappel entre les deux signaux.
     """
     from apps.catalog.models import ProductVariant
+    from django.db.models.expressions import Combinable
     from django.utils import timezone
+
+    # Même garde-fou que sync_product_stock_from_default_variant : on ne recopie
+    # jamais une expression F() non résolue vers la variante.
+    if isinstance(instance.stock, Combinable):
+        instance.refresh_from_db(fields=["stock"])
 
     stock_value = instance.stock if instance.stock is not None else 0
     name_value = instance.name[:100]  # limité à 100 char max comme défini dans le modèle
@@ -190,11 +196,25 @@ from apps.catalog.models import ProductVariant
 @receiver(post_save, sender=ProductVariant)
 def sync_product_stock_from_default_variant(sender, instance, created, **kwargs):
     """
-    Maintient le stock du produit principal synchronisé si le stock de sa 
+    Maintient le stock du produit principal synchronisé si le stock de sa
     variante par défaut est modifié.
+
+    Ce signal est le POINT UNIQUE de mise à jour de `Product.stock` : aucun
+    service ne doit écrire ce champ directement, sous peine de double
+    décrémentation.
+
+    Garde-fou F() : si un appelant a affecté `instance.stock = F('stock') - n`,
+    l'attribut contient après le save() une expression SQL non résolue et non
+    la valeur réelle. La réappliquer au produit décrémenterait une seconde fois.
+    On relit donc systématiquement la valeur persistée avant toute comparaison.
     """
     from apps.catalog.models import Product
+    from django.db.models.expressions import Combinable
     from django.utils import timezone
+
+    if isinstance(instance.stock, Combinable):
+        # Valeur issue d'une expression F() : jamais exploitable telle quelle.
+        instance.refresh_from_db(fields=["stock"])
 
     stock_value = instance.stock if instance.stock is not None else 0
     if instance.stock is None:

@@ -51,6 +51,18 @@ class UserSerializer(serializers.ModelSerializer):
             "is_verified",
         )
 
+        # SÉCURITÉ — Escalade de privilèges.
+        # Mêmes garde-fous que ecommerce_backend.users.api.serializers.UserSerializer :
+        # les champs qui portent les droits d'accès ne doivent jamais être
+        # alimentés depuis une requête cliente, quel que soit le point d'entrée
+        # qui réutilise ce serializer.
+        read_only_fields = (
+            "id",
+            "role",
+            "is_active",
+            "is_verified",
+        )
+
 
 
 

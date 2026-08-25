@@ -2,6 +2,7 @@
 import logging
 
 import sentry_sdk
+from django.core.exceptions import ImproperlyConfigured
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -10,6 +11,7 @@ from sentry_sdk.integrations.redis import RedisIntegration
 from .base import *  # noqa: F403
 from .base import DATABASES
 from .base import INSTALLED_APPS
+from .base import PAYDUNYA_CONFIG
 from .base import REDIS_URL
 from .base import SPECTACULAR_SETTINGS
 from .base import env
@@ -17,9 +19,33 @@ from .base import env
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
-SECRET_KEY = env("DJANGO_SECRET_KEY", default="Skd9VFlOLU7J8EiarvbHrzqRkc0MS5vuVIGYaXcYgJNh2lyQDP1MVmnWT2BAS2Iv")
+# SÉCURITÉ — Aucune valeur de repli : si DJANGO_SECRET_KEY n'est pas positionnée
+# dans l'environnement Render, django-environ lève ImproperlyConfigured et le
+# processus refuse de démarrer. C'est le comportement voulu : mieux vaut un
+# déploiement rouge qu'une production qui signe ses sessions avec une clé
+# publiquement lisible dans le dépôt.
+SECRET_KEY = env("DJANGO_SECRET_KEY")
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["kalvin.com"])
+
+# PAYDUNYA — Validation stricte au démarrage
+# ------------------------------------------------------------------------------
+# Les quatre clés PayDunya authentifient les appels serveur→serveur et signent
+# les notifications de paiement. Aucune valeur de repli n'existe plus dans le
+# dépôt : on vérifie explicitement leur présence pour transformer une erreur
+# silencieuse (paiements rejetés en 401, webhooks non vérifiables) en un échec
+# de démarrage immédiat et lisible dans les logs Render.
+_MISSING_PAYDUNYA_KEYS = [
+    f"PAYDUNYA_{name}"
+    for name in ("MASTER_KEY", "PUBLIC_KEY", "PRIVATE_KEY", "TOKEN")
+    if not PAYDUNYA_CONFIG[name]
+]
+if _MISSING_PAYDUNYA_KEYS:
+    raise ImproperlyConfigured(
+        "Variables d'environnement PayDunya manquantes en production : "
+        + ", ".join(_MISSING_PAYDUNYA_KEYS)
+        + ". Renseignez-les dans la configuration du service avant tout déploiement.",
+    )
 
 # DATABASES
 # ------------------------------------------------------------------------------
@@ -267,8 +293,23 @@ SPECTACULAR_SETTINGS["SERVERS"] = [
 
 
 
-# Désactiver Celery car non utilisé pour le moment
-CELERY_TASK_ALWAYS_EAGER = True
+# CELERY
+# ------------------------------------------------------------------------------
+# Aucun service worker/beat n'est déployé sur Render (un seul service web, cf.
+# compose/production/django/start). Le mode EAGER exécute donc toute tâche
+# appelée par `.delay()` de façon SYNCHRONE, dans le process web — c'est
+# volontaire et cohérent avec l'infrastructure actuelle.
+#
+# Conséquence à connaître : CELERY_BEAT_SCHEDULE n'est pas honoré. Les travaux
+# périodiques doivent passer par une commande de management branchée sur un cron
+# Render :
+#     Daily 02:00 UTC → python manage.py expirer_points_fidelite
+#
+# Pour basculer sur un vrai worker : déployer deux services Render
+# supplémentaires (`celery -A config.celery_app worker` et `... beat`), pointer
+# CELERY_BROKER_URL / CELERY_RESULT_BACKEND sur REDIS_URL, puis passer
+# CELERY_TASK_ALWAYS_EAGER à False.
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=True)
 CELERY_TASK_EAGER_PROPAGATES = True
-CELERY_BROKER_URL = "memory://"
-CELERY_RESULT_BACKEND = "cache+memory://"
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="memory://")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="cache+memory://")

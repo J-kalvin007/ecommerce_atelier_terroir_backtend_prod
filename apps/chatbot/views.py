@@ -30,6 +30,16 @@ from .serializers import (
 from .services import ChatService
 from .search_service import AISearchService
 from .recommendation_service import RecommendationService
+from .throttles import (
+    AISearchAnonRateThrottle,
+    AISearchMonthlyThrottle,
+    AISearchUserRateThrottle,
+    ChatbotAnonRateThrottle,
+    ChatbotMonthlyThrottle,
+    ChatbotUserRateThrottle,
+    RecommendationAnonRateThrottle,
+    RecommendationUserRateThrottle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +77,14 @@ class ChatView(APIView):
 
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [AllowAny]
+    # COÛT — chaque appel déclenche jusqu'à 2 requêtes OpenAI (1000 tokens chacune).
+    # L'endpoint étant public, la limitation de débit est la seule barrière
+    # entre un script en boucle et une facture OpenAI non bornée.
+    throttle_classes = [
+        ChatbotAnonRateThrottle,
+        ChatbotUserRateThrottle,
+        ChatbotMonthlyThrottle,
+    ]
 
     @extend_schema(
         summary="Chatbot IA — Envoyer un message",
@@ -154,6 +172,12 @@ class AISearchView(APIView):
 
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [AllowAny]
+    # COÛT — un appel OpenAI de reformulation (jusqu'à 1500 tokens) par requête.
+    throttle_classes = [
+        AISearchAnonRateThrottle,
+        AISearchUserRateThrottle,
+        AISearchMonthlyThrottle,
+    ]
 
     @extend_schema(
         summary="Chatbot IA — Recherche intelligente",
@@ -236,6 +260,12 @@ class RecommendationView(APIView):
 
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [AllowAny]
+    # 100 % ORM (aucun appel OpenAI) mais les agrégations restent coûteuses en DB :
+    # quotas plus souples que les deux vues ci-dessus, sans quota mensuel.
+    throttle_classes = [
+        RecommendationAnonRateThrottle,
+        RecommendationUserRateThrottle,
+    ]
 
     @extend_schema(
         summary="Chatbot IA — Recommandations personnalisées",

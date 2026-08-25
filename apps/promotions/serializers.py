@@ -255,7 +255,7 @@ class AdminSoldesSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at", "original_price", "product_sold_count")
 
     def to_representation(self, instance):
-        from apps.catalog.serializers import ProductListSerializer, ProductVariantSerializer
+        from apps.catalog.serializers import ProductListSerializer
         representation = super().to_representation(instance)
         if instance.product:
             representation["product"] = ProductListSerializer(instance.product, context=self.context).data

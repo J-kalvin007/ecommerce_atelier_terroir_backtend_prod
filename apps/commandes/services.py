@@ -71,15 +71,18 @@ class OrderService:
         for item in items:
             pid = str(item["product_id"])
 
+            # Verrou pessimiste dès la lecture : la vérification de disponibilité
+            # et la décrémentation qui suit doivent être atomiques, sinon deux
+            # commandes concurrentes peuvent valider le même dernier article.
             # 1. Chercher d'abord dans ProductVariant directement
-            variant = ProductVariant.objects.filter(
+            variant = ProductVariant.objects.select_for_update().filter(
                 id=pid,
                 is_active=True,
             ).first()
 
             # 2. Fallback : si l'id correspond à un Product, prendre sa première variante active
             if not variant:
-                variant = ProductVariant.objects.filter(
+                variant = ProductVariant.objects.select_for_update().filter(
                     product_id=pid,
                     is_active=True,
                 ).first()
@@ -175,14 +178,14 @@ class OrderService:
                 )
             )
 
-            # Décrémentation immédiate du stock de la variante
-            variant.stock -= quantity
-            variant.save(update_fields=["stock"])
-
-            produit_principal = variant.product
-            if produit_principal:
-                produit_principal.stock = max(0, produit_principal.stock - quantity)
-                produit_principal.save(update_fields=["stock"])
+            # Décrémentation immédiate du stock de la variante.
+            # Le stock du produit principal n'est PAS écrit ici : il est
+            # recopié depuis la variante par défaut par le signal post_save de
+            # ProductVariant (apps/catalog/signals.py). Le mettre à jour aux
+            # deux endroits décrémentait deux fois le même stock pour les
+            # variantes par défaut, et le décrémentait à tort pour les autres.
+            variant.stock = max(0, variant.stock - quantity)
+            variant.save(update_fields=["stock", "updated_at"])
 
         OrderItem.objects.bulk_create(order_items)
 

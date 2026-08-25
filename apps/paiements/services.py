@@ -222,9 +222,14 @@ class PaymentService:
                 description=f"Recharge wallet {user.email}",
                 reference=payment.reference_externe,  # sera généré par la gateway
             )
+            # `reference_externe` porte à lui seul l'idempotence : il est
+            # l'unique clé de rapprochement avec le token PayDunya. L'ancien
+            # champ `webhook_token` n'existe pas sur le modèle Payment (il est
+            # commenté dans models.py) : l'affecter faisait échouer le save()
+            # avec « The following fields do not exist in this model », ce qui
+            # cassait POST /paiements/wallet/deposit/ en production.
             payment.reference_externe = response["token"]
-            payment.webhook_token = response["token"]  # pour idempotence
-            payment.save(update_fields=["reference_externe", "webhook_token"])
+            payment.save(update_fields=["reference_externe", "updated_at"])
             return payment, response["redirect_url"]
         except PaymentGatewayError:
             payment.status = Payment.Status.FAILED
@@ -263,8 +268,7 @@ class PaymentService:
             )
             logger.info(f"[PaymentService] Réponse gateway succès: {response}")
             payment.reference_externe = response["token"]
-            payment.webhook_token = response["token"]
-            payment.save(update_fields=["reference_externe", "webhook_token"])
+            payment.save(update_fields=["reference_externe", "updated_at"])
             logger.info(f"[PaymentService] Payment model {payment.id} mis à jour.")
             return payment, response["redirect_url"]
         except PaymentGatewayError as e:
@@ -308,7 +312,7 @@ class PaymentService:
                 )
                 payment.status = Payment.Status.SUCCESS
                 payment.reference_externe = reference
-                payment.save(update_fields=["status", "reference_externe"])
+                payment.save(update_fields=["status", "reference_externe", "updated_at"])
                 OrderService.update_status(
                     order=order,
                     new_status=OrderStatus.PAID,
@@ -316,34 +320,10 @@ class PaymentService:
                     comment="Paiement validé par Wallet"
                 )
 
-                # --- Décrémentation des stocks ---
-                from apps.catalog.models import ProductVariant
-                for item in order.items.all():
-                    # 1. Chercher si la ligne correspond à une variation via le SKU
-                    variant = ProductVariant.objects.filter(sku=item.product_sku).first()
-                    
-                    if variant:
-                        ancien_stock = variant.stock
-                        variant.stock = max(0, variant.stock - item.quantity)
-                        variant.save()
-                        logger.info(f"Stock de la variante '{variant.name}' (SKU: {variant.sku}) décrémenté : {ancien_stock} -> {variant.stock}")
-                        
-                        produit_principal = variant.product
-                        if produit_principal:
-                            ancien_stock_p = produit_principal.stock
-                            produit_principal.stock = max(0, produit_principal.stock - item.quantity)
-                            produit_principal.save()
-                            logger.info(f"Stock du produit '{produit_principal.name}' (SKU: {produit_principal.sku}) décrémenté : {ancien_stock_p} -> {produit_principal.stock}")
-                    else:
-                        # 2. Si aucune variation ne correspond, on décrémente le produit principal
-                        produit_principal = item.product
-                        if produit_principal:
-                            ancien_stock = produit_principal.stock
-                            produit_principal.stock = max(0, produit_principal.stock - item.quantity)
-                            produit_principal.save()
-                            logger.info(f"Stock du produit '{produit_principal.name}' (SKU: {produit_principal.sku}) décrémenté : {ancien_stock} -> {produit_principal.stock}")
-                        else:
-                            logger.warning(f"Impossible de décrémenter le stock : aucun produit/variante trouvé pour le SKU {item.product_sku}")
+                # Le stock N'EST PAS décrémenté ici : OrderService.create_order
+                # est le point unique de réservation du stock, appliqué dès la
+                # création de la commande. Le re-décrémenter à l'encaissement
+                # consommait deux fois le stock de chaque commande payée.
 
                 logger.info(
                     "Commande %s payée via wallet (user %s).",
@@ -364,68 +344,103 @@ class PaymentService:
         """
         Traite un callback PayDunya.
 
-        - Vérifie le statut auprès de l'API PayDunya.
-        - Applique l'idempotence basée sur le token.
+        - Applique l'idempotence basée sur le token (`reference_externe`).
+        - Vérifie le statut auprès de l'API PayDunya : le corps du callback
+          n'est JAMAIS considéré comme source de vérité.
         - Si succès et wallet_topup, crédite le wallet.
-        """
 
-        # Vérifier si le token a déjà été traité (idempotence)
-        existing_payment = Payment.objects.filter(webhook_token=token).first()
+        Args:
+            token: token PayDunya de la transaction.
+            payload: corps brut du callback, conservé pour traçabilité.
+
+        Returns:
+            Payment: la ligne de paiement dans son état final.
+
+        Raises:
+            PaymentGatewayError: si la vérification auprès de PayDunya échoue.
+        """
+        logger.info("[PaymentService] Callback PayDunya reçu pour le token %s.", token)
+
+        # ── Idempotence : `reference_externe` est l'unique clé de rapprochement
+        # avec PayDunya. L'ancienne implémentation interrogeait un champ
+        # `webhook_token` inexistant sur le modèle et journalisait dans un
+        # `log_entry` jamais défini : toute exécution levait NameError.
+        existing_payment = Payment.objects.filter(reference_externe=token).first()
         if existing_payment and existing_payment.status == Payment.Status.SUCCESS:
-            log_entry.status_traitement = "duplicate"
-            log_entry.notes = "Transaction déjà traitée avec succès."
-            log_entry.save()
+            logger.info(
+                "[PaymentService] Token %s déjà traité avec succès : callback ignoré.",
+                token,
+            )
             return existing_payment
 
-        # Vérification active auprès de PayDunya
+        # ── Vérification active auprès de PayDunya (source de vérité) ────────
         try:
             status_info = self.gateway.verify_payment(token)
         except PaymentGatewayError as e:
-            log_entry.status_traitement = "error"
-            log_entry.notes = f"Échec vérification gateway : {e}"
-            log_entry.save()
+            logger.error(
+                "[PaymentService] Échec de vérification du token %s : %s", token, e,
+            )
             raise
 
         with transaction.atomic():
-            if not existing_payment:
-                # Tenter de retrouver un paiement par token (au cas où)
-                existing_payment = Payment.objects.filter(
-                    webhook_token=token
-                ).first()
-                if not existing_payment:
-                    # Cas rare : callback avant création du Payment local
-                    # On crée un objet minimum à partir du payload
-                    existing_payment = Payment.objects.create(
-                        provider=Payment.Provider.PAYDUNYA,
-                        payment_type=Payment.PaymentType.WALLET_TOPUP,
-                        amount=Decimal(status_info.get("amount", 0)),
-                        status=Payment.Status.PENDING,
-                        reference_externe=token,
-                        webhook_token=token,
-                    )
+            if existing_payment:
+                # Verrou pessimiste : sérialise deux callbacks concurrents.
+                existing_payment = Payment.objects.select_for_update().get(
+                    pk=existing_payment.pk,
+                )
+            else:
+                # Cas rare : callback reçu avant la création du Payment local.
+                existing_payment = Payment.objects.create(
+                    provider=Payment.Provider.PAYDUNYA,
+                    payment_type=Payment.PaymentType.WALLET_TOPUP,
+                    amount=Decimal(str(status_info.get("amount") or "0")),
+                    status=Payment.Status.PENDING,
+                    reference_externe=token,
+                )
 
+            # Seconde barrière d'idempotence, à l'intérieur du verrou.
             if existing_payment.status == Payment.Status.SUCCESS:
-                log_entry.status_traitement = "duplicate"
-                log_entry.notes = "Déjà succès."
-                log_entry.save()
+                logger.info(
+                    "[PaymentService] Token %s déjà au statut SUCCESS : callback ignoré.",
+                    token,
+                )
                 return existing_payment
 
             if status_info.get("status") != "completed":
                 existing_payment.status = Payment.Status.FAILED
-                existing_payment.save(update_fields=["status"])
-                log_entry.status_traitement = "processed"
-                log_entry.notes = "Statut PayDunya non 'completed'."
-                log_entry.save()
+                existing_payment.metadata = {
+                    **(existing_payment.metadata or {}),
+                    "webhook_payload": payload,
+                    "verified_status": status_info.get("status"),
+                }
+                existing_payment.save(
+                    update_fields=["status", "metadata", "updated_at"],
+                )
+                logger.warning(
+                    "[PaymentService] Statut vérifié non finalisé pour %s : %s.",
+                    token,
+                    status_info.get("status"),
+                )
                 return existing_payment
 
             existing_payment.status = Payment.Status.SUCCESS
-            existing_payment.save(update_fields=["status"])
+            existing_payment.metadata = {
+                **(existing_payment.metadata or {}),
+                "webhook_payload": payload,
+                "verified_status": status_info.get("status"),
+            }
+            existing_payment.save(update_fields=["status", "metadata", "updated_at"])
 
             # Crédit wallet si nécessaire
             if existing_payment.payment_type == Payment.PaymentType.WALLET_TOPUP:
-                wallet = Wallet.objects.filter(
-                    user=existing_payment.order.user
-                ).first() if existing_payment.order else None
+                # Le wallet est rattaché soit directement au paiement, soit à
+                # l'utilisateur porteur de la transaction.
+                wallet = existing_payment.wallet
+                if wallet is None and existing_payment.user_id:
+                    wallet = Wallet.objects.filter(
+                        user_id=existing_payment.user_id,
+                    ).first()
+
                 if not wallet:
                     # Fallback : impossible sans lien, on log
                     logger.warning("Impossible de créditer : aucun wallet trouvé pour %s", token)
@@ -434,12 +449,12 @@ class PaymentService:
                         wallet=wallet,
                         amount=existing_payment.amount,
                         reference=f"WAL-{existing_payment.pk}",
-                        metadata={"webhook_token": token},
+                        metadata={"paydunya_token": token},
                     )
 
             elif existing_payment.payment_type == Payment.PaymentType.DIRECT_PAYMENT:
                 # Mettre à jour la commande
-                if existing_payment.order:
+                if existing_payment.order and existing_payment.order.status != OrderStatus.PAID:
                     OrderService.update_status(
                         order=existing_payment.order,
                         new_status=OrderStatus.PAID,
@@ -447,11 +462,8 @@ class PaymentService:
                         comment="Paiement validé par PayDunya (Webhook)"
                     )
 
-            log_entry.status_traitement = "processed"
-            log_entry.notes = "Traitement réussi."
-            log_entry.save()
+            logger.info("[PaymentService] Token %s traité avec succès.", token)
             return existing_payment
-
 
 
 
