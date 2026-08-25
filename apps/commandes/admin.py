@@ -14,7 +14,7 @@ from apps.commandes.models import (
 
 class OrderItemInline(admin.TabularInline):
     """
-    Affiche la liste des produits achetés directement dans la fiche commande.
+    Affichee la liste des produits achetés directement dans la fiche commande.
     En lecture seule pour éviter de modifier une vente déjà conclue.
     """
     model = OrderItem
