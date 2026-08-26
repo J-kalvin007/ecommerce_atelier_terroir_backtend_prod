@@ -177,12 +177,16 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Mes livraisons",
-        description="Retourne les livraisons créées par l'utilisateur connecté, avec les données enrichies du livreur.",
+        description="Retourne les livraisons du client connecté (liées à ses commandes), avec les données enrichies du livreur.",
         responses={200: MyDeliverySerializer(many=True)}
     )
     @action(detail=False, methods=["get"], url_path="my-livraisons", permission_classes=[permissions.IsAuthenticated])
     def my_livraisons(self, request):
-        deliveries = Delivery.objects.filter(created_by=request.user).select_related("order", "delivery_person", "livreur")
+        # Filtre par order__user (le propriétaire de la commande) et non par created_by
+        # car les livraisons sont auto-créées par le signal et created_by est None ou l'admin
+        deliveries = Delivery.objects.filter(
+            order__user=request.user
+        ).select_related("order", "delivery_person", "livreur")
         deliveries = self.filter_queryset(deliveries)
         page = self.paginate_queryset(deliveries)
         if page is not None:

@@ -1,6 +1,9 @@
+import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.db.models import F
+
+logger = logging.getLogger(__name__)
 
 from apps.commandes.models import OrderItem
 
@@ -42,14 +45,30 @@ def trigger_delivery_creation_on_paid(sender, instance, created, **kwargs):
             from apps.livraisons.models import Delivery, DeliveryStatus
             
             def create_delivery():
-                Delivery.objects.get_or_create(
-                    order=order,
-                    defaults={
-                        'status': DeliveryStatus.PENDING,
-                        'delivery_address': order.address_livraison,
-                        'notes': order.notes,
-                        'created_by': instance.changed_by
-                    }
-                )
-                
+                try:
+                    delivery, delivery_created = Delivery.objects.get_or_create(
+                        order=order,
+                        defaults={
+                            'status': DeliveryStatus.PENDING,
+                            'delivery_address': order.address_livraison or '',
+                            'notes': order.notes or '',
+                        }
+                    )
+                    if delivery_created:
+                        logger.info(
+                            f"[Signal] Livraison créée automatiquement pour la commande "
+                            f"{order.numero_commande or order.pk} (user={order.user_id})"
+                        )
+                    else:
+                        logger.info(
+                            f"[Signal] Livraison déjà existante pour la commande "
+                            f"{order.numero_commande or order.pk}"
+                        )
+                except Exception as exc:
+                    logger.error(
+                        f"[Signal] Échec de création de livraison pour la commande "
+                        f"{order.numero_commande or order.pk}: {exc}",
+                        exc_info=True
+                    )
+                    
             transaction.on_commit(create_delivery)
