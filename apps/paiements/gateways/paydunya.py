@@ -63,20 +63,40 @@ class PayDunyaGateway(BaseGateway):
     Les 4 clés sont transmises comme headers HTTP à chaque requête.
     """
 
-    # URL de base officielle de l'API PayDunya
-    DEFAULT_BASE_URL = "https://app.paydunya.com/api/v1"
+    # URLs de base PayDunya
+    LIVE_BASE_URL    = "https://app.paydunya.com/api/v1"
+    SANDBOX_BASE_URL = "https://app.paydunya.com/sandbox-api/v1"
+    # Alias pour compatibilité
+    DEFAULT_BASE_URL = LIVE_BASE_URL
 
     def __init__(self):
         self.master_key  = getattr(settings, "PAYDUNYA_MASTER_KEY",  "")
         self.public_key  = getattr(settings, "PAYDUNYA_PUBLIC_KEY",  "")
         self.private_key = getattr(settings, "PAYDUNYA_PRIVATE_KEY", "")
         self.token       = getattr(settings, "PAYDUNYA_TOKEN",        "")
-        # On force la bonne URL si une mauvaise a été configurée
-        env_url = getattr(settings, "PAYDUNYA_BASE_URL", self.DEFAULT_BASE_URL)
-        if "paydunya.com" in env_url and "app.paydunya.com" not in env_url:
-            env_url = "https://app.paydunya.com/api/v1"
-        self.base_url    = env_url.rstrip("/")
         self.mode        = getattr(settings, "PAYDUNYA_MODE", "test")
+
+        # En mode test → URL sandbox. En mode live → URL production.
+        # La lib `paydunya` fait ça automatiquement via paydunya.debug=True,
+        # mais PayDunyaGateway fait des appels HTTP directs : il faut donc
+        # sélectionner manuellement la bonne URL selon le mode.
+        if self.mode == "live":
+            default_url = self.LIVE_BASE_URL
+        else:
+            default_url = self.SANDBOX_BASE_URL
+
+        env_url = getattr(settings, "PAYDUNYA_BASE_URL", default_url)
+        # Si la variable d'env est toujours sur l'URL live mais qu'on est en test,
+        # on force le sandbox pour éviter les erreurs "LIVE key combination invalid".
+        if self.mode == "test" and "sandbox-api" not in env_url:
+            env_url = self.SANDBOX_BASE_URL
+        self.base_url = env_url.rstrip("/")
+
+        logger.info(
+            "[PayDunyaGateway] Initialisé en mode=%s | base_url=%s",
+            self.mode,
+            self.base_url,
+        )
 
         # Validation des clés au démarrage (log d'avertissement, pas d'exception)
         if not all([self.master_key, self.public_key, self.private_key, self.token]):

@@ -530,7 +530,16 @@ PAYDUNYA_PUBLIC_KEY = PAYDUNYA_CONFIG["PUBLIC_KEY"]
 PAYDUNYA_PRIVATE_KEY = PAYDUNYA_CONFIG["PRIVATE_KEY"]
 PAYDUNYA_TOKEN = PAYDUNYA_CONFIG["TOKEN"]
 PAYDUNYA_MODE = PAYDUNYA_CONFIG["MODE"]
-PAYDUNYA_BASE_URL = env("PAYDUNYA_BASE_URL", default="https://app.paydunya.com/api/v1")
+# En mode test → URL sandbox PayDunya. En mode live → URL production.
+# La gateway custom (PayDunyaGateway) fait ses appels HTTP directement,
+# elle doit donc cibler la bonne URL selon le mode — contrairement à
+# la lib paydunya qui gère ça automatiquement via paydunya.debug.
+_paydunya_default_base = (
+    "https://app.paydunya.com/sandbox-api/v1"
+    if PAYDUNYA_MODE == "test"
+    else "https://app.paydunya.com/api/v1"
+)
+PAYDUNYA_BASE_URL = env("PAYDUNYA_BASE_URL", default=_paydunya_default_base)
 
 PAYDUNYA_URLS = {
     "test": "https://paydunya.com",
