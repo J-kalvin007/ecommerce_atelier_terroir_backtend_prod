@@ -265,8 +265,13 @@ class PayDunyaWebhookView(APIView):
         }
     )
     def post(self, request):
+        # PayDunya sends the token inside the 'invoice' object in the IPN payload
         token = request.data.get("token")
+        if not token and "invoice" in request.data:
+            token = request.data.get("invoice", {}).get("token")
+            
         if not token:
+            logger.error(f"[PayDunyaWebhookView] Token manquant dans le payload: {request.data}")
             return Response(
                 {"detail": "Token manquant."}, status=status.HTTP_400_BAD_REQUEST
             )

@@ -173,7 +173,7 @@ class PayDunyaGateway(BaseGateway):
         
         cancel_url = getattr(settings, "PAYDUNYA_CANCEL_URL", f"{frontend_url}/commandes")
         return_url = getattr(settings, "PAYDUNYA_RETURN_URL", f"{frontend_url}/commandes?payment=success")
-        callback_url = getattr(settings, "PAYDUNYA_CALLBACK_URL", f"{backend_url}/api/v1/paiements/webhook/paydunya/")
+        callback_url = getattr(settings, "PAYDUNYA_CALLBACK_URL", f"{backend_url}/api/v1/paiements/ipn/")
         
         if cancel_url:
             actions["cancel_url"] = cancel_url

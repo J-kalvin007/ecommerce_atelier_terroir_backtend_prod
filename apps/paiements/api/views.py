@@ -105,61 +105,104 @@ def paydunya_webhook(request):
     Chaîne de confiance appliquée, dans cet ordre :
 
       1. Contrôle du hash `sha512(MASTER_KEY)` en comparaison à temps constant.
-         Ce hash est une constante partagée : il filtre le bruit mais ne prouve
-         RIEN sur le montant ni le statut. Il n'est donc jamais suffisant.
-      2. Idempotence : si un Payment SUCCESS existe déjà pour ce token, on sort
+         Downgrade en WARNING en mode test (PayDunya test IPN n'envoie pas toujours le hash).
+      2. Extraction du token depuis le payload (JSON ou form-encoded).
+      3. Idempotence : si un Payment SUCCESS existe déjà pour ce token, on sort
          immédiatement en 200 (un rejeu ne doit jamais recréditer ni redébiter).
-      3. Vérification serveur→serveur auprès de PayDunya (`verify_payment`).
+      4. Vérification serveur→serveur auprès de PayDunya (`verify_payment`).
          C'est la SEULE source de vérité : statut, montant et description sont
          relus depuis l'API, jamais depuis le corps du POST.
-      4. Traitement métier sous transaction + verrou pessimiste sur la ligne
+      5. Traitement métier sous transaction + verrou pessimiste sur la ligne
          Order/Wallet concernée.
     """
     logger.info("=== Webhook PayDunya reçu ===")
+    logger.info("[IPN] Content-Type: %s", request.content_type)
+    logger.info("[IPN] Payload brut: %s", request.data)
 
-    data = request.POST.dict()
+    # ── Extraction du payload : PayDunya peut envoyer JSON ou form-encoded ────
+    # request.data est déjà parsé par DRF (JSON ou form selon Content-Type)
+    raw = request.data
 
-    token = data.get("data[invoice][token]")
-    status_payment = data.get("data[status]")  # 'completed', 'pending', ou 'cancelled'
-    description_payment = data.get("data[invoice][description]")
-    amount_payment_str = data.get("data[invoice][total_amount]")
+    # PayDunya IPN format : les données peuvent être dans raw["data"] (form-encoded)
+    # ou directement à la racine (JSON). On supporte les deux.
+    if "data" in raw and isinstance(raw["data"], dict):
+        # Format JSON structuré : {"data": {"invoice": {...}, "status": "...", "hash": "..."}}
+        ipn_data = raw["data"]
+        token = (ipn_data.get("invoice") or {}).get("token")
+        status_payment = ipn_data.get("status")
+        description_payment = (ipn_data.get("invoice") or {}).get("description")
+        amount_payment_str = (ipn_data.get("invoice") or {}).get("total_amount")
+        received_hash = ipn_data.get("hash") or ""
+    else:
+        # Format form-encoded (clés bracket notation) ou JSON plat
+        ipn_data = raw if isinstance(raw, dict) else {}
+        token = (
+            ipn_data.get("data[invoice][token]")
+            or (ipn_data.get("invoice") or {}).get("token")
+            or ipn_data.get("token")
+        )
+        status_payment = ipn_data.get("data[status]") or ipn_data.get("status")
+        description_payment = (
+            ipn_data.get("data[invoice][description]")
+            or (ipn_data.get("invoice") or {}).get("description")
+        )
+        amount_payment_str = (
+            ipn_data.get("data[invoice][total_amount]")
+            or (ipn_data.get("invoice") or {}).get("total_amount")
+        )
+        received_hash = ipn_data.get("data[hash]") or ipn_data.get("hash") or ""
+
     amount_payment = _to_decimal(amount_payment_str)
+    is_test_mode = getattr(settings, "PAYDUNYA_MODE", "test") == "test"
 
     logger.info(
-        "Notification brute — Token: %s, Statut annoncé: %s, Description annoncée: %s, "
-        "Montant annoncé: %s",
+        "[IPN] Notification parsée — Token: %s | Statut: %s | Description: %s | Montant: %s",
         token,
         status_payment,
         description_payment,
         amount_payment,
     )
 
-    # ── 1. Contrôle du hash partagé (filtre bon marché, non probant) ──────────
+    # ── 1. Contrôle du hash partagé ──────────────────────────────────────────
     master_key = settings.PAYDUNYA_CONFIG["MASTER_KEY"].encode()
     expected_hash = hashlib.sha512(master_key).hexdigest()
-    received_hash = data.get("data[hash]") or ""
 
-    if not hmac.compare_digest(received_hash, expected_hash):
-        logger.error("SIGNATURE INVALIDE : Le hash reçu ne correspond pas.")
-        return Response(
-            {"error": "Signature invalide"},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    hash_valid = received_hash and hmac.compare_digest(received_hash, expected_hash)
+    if not hash_valid:
+        if is_test_mode:
+            # En mode test, PayDunya n'envoie pas toujours le hash : on log et on continue
+            logger.warning(
+                "[IPN] Hash manquant ou invalide (mode TEST — traitement poursuivi). "
+                "Reçu: %r | Attendu: %r",
+                received_hash,
+                expected_hash,
+            )
+        else:
+            logger.error(
+                "[IPN] SIGNATURE INVALIDE en mode LIVE. Reçu: %r | Attendu: %r",
+                received_hash,
+                expected_hash,
+            )
+            return Response(
+                {"error": "Signature invalide"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
+    # ── 2. Token obligatoire ──────────────────────────────────────────────────
     if not token:
-        logger.error("Token de transaction manquant dans la notification.")
+        logger.error("[IPN] Token de transaction manquant dans la notification.")
         return Response(
             {"detail": "token de la transaction invalide"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # ── 2. Idempotence : ce token a-t-il déjà été encaissé ? ──────────────────
+    # ── 3. Idempotence : ce token a-t-il déjà été encaissé ? ─────────────────
     if Payment.objects.filter(
         reference_externe=token,
         status=Payment.Status.SUCCESS,
     ).exists():
         logger.info(
-            "Notification ignorée : le token %s a déjà été traité avec succès.",
+            "[IPN] Notification ignorée : le token %s a déjà été traité avec succès.",
             token,
         )
         return Response(
@@ -167,12 +210,12 @@ def paydunya_webhook(request):
             status=status.HTTP_200_OK,
         )
 
-    # ── 3. Vérification serveur→serveur : seule source de vérité ─────────────
+    # ── 4. Vérification serveur→serveur : seule source de vérité ─────────────
     try:
         verification = PayDunyaGateway().verify_payment(token)
     except PaymentGatewayError as exc:
         logger.error(
-            "Vérification PayDunya impossible pour le token %s : %s", token, exc,
+            "[IPN] Vérification PayDunya impossible pour le token %s : %s", token, exc,
         )
         return Response(
             {"detail": "Vérification du paiement auprès de PayDunya impossible."},
@@ -186,8 +229,8 @@ def paydunya_webhook(request):
     verified_amount = _to_decimal(verification.get("amount"))
 
     logger.info(
-        "Vérification PayDunya — Token: %s, Statut vérifié: %s, Description vérifiée: %s, "
-        "Montant vérifié: %s",
+        "[IPN] Vérification PayDunya — Token: %s | Statut vérifié: %s | "
+        "Description: %s | Montant vérifié: %s",
         token,
         verified_status,
         verified_description,
@@ -196,7 +239,7 @@ def paydunya_webhook(request):
 
     if verified_status != "completed":
         logger.warning(
-            "Statut vérifié non finalisé pour le token %s : %s (annoncé : %s).",
+            "[IPN] Statut vérifié non finalisé pour le token %s : %s (annoncé : %s).",
             token,
             verified_status,
             status_payment,
@@ -206,7 +249,7 @@ def paydunya_webhook(request):
             status=status.HTTP_200_OK,
         )
 
-    # ── 4. Traitement métier, piloté par les données vérifiées ───────────────
+    # ── 5. Traitement métier, piloté par les données vérifiées ───────────────
     if verified_description == "ACHAT-PRODUIT":
         return _handle_verified_order_payment(token, verified_amount)
 
@@ -214,7 +257,7 @@ def paydunya_webhook(request):
         return _handle_verified_wallet_topup(token, verified_amount)
 
     logger.warning(
-        "Description de paiement non reconnue pour le token %s : %r.",
+        "[IPN] Description de paiement non reconnue pour le token %s : %r.",
         token,
         verified_description,
     )
