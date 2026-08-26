@@ -282,22 +282,7 @@ class Recette(BaseModel):
         verbose_name = "Recette"
         verbose_name_plural = "Recettes"
         ordering = ["-created_at"]
-        constraints = [
-            # Une recette est liée à UN produit OU à UN pack, jamais aux deux
-            # à la fois. Les deux champs restent individuellement nullable
-            # (une recette "brouillon" peut n'avoir ni l'un ni l'autre).
-            models.CheckConstraint(
-                check=~(
-                    models.Q(product__isnull=False)
-                    & models.Q(pack__isnull=False)
-                ),
-                name="recette_produit_xor_pack",
-                violation_error_message=(
-                    "Une recette ne peut être liée qu'à un seul produit OU un "
-                    "seul pack, jamais les deux à la fois."
-                ),
-            ),
-        ]
+
 
     def __str__(self):
         return self.nom or str(self.id)

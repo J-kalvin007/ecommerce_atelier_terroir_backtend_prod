@@ -79,23 +79,6 @@ class AdminRecetteSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("id", "created_at", "updated_at")
 
-    def validate(self, attrs):
-        """
-        Une recette ne peut être rattachée qu'à un seul produit OU un seul
-        pack à la fois (jamais les deux). Cette règle est également
-        garantie en base par une contrainte CHECK (voir Recette.Meta), mais
-        on la valide ici en amont pour renvoyer une erreur 400 lisible côté
-        API plutôt qu'une IntegrityError brute.
-        """
-        product = attrs.get("product", getattr(self.instance, "product", None))
-        pack = attrs.get("pack", getattr(self.instance, "pack", None))
-
-        if product and pack:
-            raise serializers.ValidationError(
-                "Une recette ne peut être liée qu'à un seul produit OU un "
-                "seul pack, pas les deux à la fois."
-            )
-        return attrs
 
     def create(self, validated_data):
         try:

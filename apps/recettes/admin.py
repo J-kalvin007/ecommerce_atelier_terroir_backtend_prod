@@ -82,9 +82,6 @@ class RecetteAdmin(admin.ModelAdmin):
         (
             "Association produit / pack",
             {
-                "description": (
-                    "Une recette est liée à un produit OU à un pack, jamais aux deux à la fois."
-                ),
                 "fields": (
                     "product",
                     "pack",

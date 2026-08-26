@@ -79,7 +79,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="recette",
             constraint=models.CheckConstraint(
-                check=~(models.Q(product__isnull=False) & models.Q(pack__isnull=False)),
+                condition=~(models.Q(product__isnull=False) & models.Q(pack__isnull=False)),
                 name="recette_produit_xor_pack",
                 violation_error_message="Une recette ne peut être liée qu'à un seul produit OU un seul pack, jamais les deux à la fois.",
             ),
