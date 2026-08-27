@@ -560,7 +560,7 @@ paydunya.api_keys = {
 }
 
 # On peut utiliser MODE test ou live en fonction de l'environnement, ici debug est True par défaut comme initialement
-paydunya.debug = True
+paydunya.debug = False
 
 PAYDUNYA_CALLBACK_URL = f"{BACKEND_URL}/api/v1/paiements/ipn/"
 
